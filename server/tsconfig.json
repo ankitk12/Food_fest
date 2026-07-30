@@ -1,7 +1,6 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "composite": true,
     "outDir": "dist",
     "rootDir": "..",
     "types": ["node"],
@@ -11,6 +10,14 @@
       "@domain/*": ["domain/*"]
     }
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../types/**/*.ts",
+    "../domain/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts"
+  ]
 }
