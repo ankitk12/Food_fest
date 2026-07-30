@@ -13,7 +13,6 @@
       "@domain/*": ["domain/*"]
     }
   },
-  "references": [{ "path": "../tsconfig.json" }],
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
 }
