@@ -5,26 +5,21 @@
       "stallId": "stall-tandoori",
       "items": [
         {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 1
-        },
-        {
           "itemId": "item-jamun-shots",
           "name": "Jamun Shots",
-          "unitPrice": 30,
-          "quantity": 3
+          "unitPrice": 35,
+          "quantity": 4
         }
       ],
-      "total": 150,
-      "status": "Happiness Disbursed",
+      "total": 132,
+      "status": "Craving Funded",
       "paid": true,
       "paymentMethod": "UPI",
       "gatewayRef": "MOCK-000001",
-      "customerId": "9512311001",
-      "createdAt": "2026-07-28T09:51:42.836Z",
-      "spinUsed": false
+      "customerId": "5487894587",
+      "createdAt": "2026-07-28T13:49:20.517Z",
+      "spinUsed": false,
+      "pointsUsed": 16
     },
     {
       "token": "A-0002",
@@ -33,130 +28,130 @@
         {
           "itemId": "item-momos",
           "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 1
+          "unitPrice": 90,
+          "quantity": 2
         }
       ],
-      "total": 60,
+      "total": 173.5,
       "status": "Happiness Disbursed",
       "paid": true,
       "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000002",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T09:55:08.915Z",
-      "spinUsed": false
+      "gatewayRef": "MOCK-000001",
+      "customerId": "5487894587",
+      "createdAt": "2026-07-28T13:55:31.061Z",
+      "spinUsed": false,
+      "pointsUsed": 13,
+      "discount": 6.5
     },
     {
       "token": "A-0003",
       "stallId": "stall-tandoori",
       "items": [
         {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 1
+          "itemId": "item-jamun-shots",
+          "name": "Jamun Shots",
+          "unitPrice": 35,
+          "quantity": 2
         }
       ],
-      "total": 60,
-      "status": "Happiness Disbursed",
+      "total": 70,
+      "status": "Craving Funded",
       "paid": true,
       "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000001",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T09:55:36.455Z",
-      "spinUsed": false
+      "gatewayRef": "MOCK-000002",
+      "customerId": "5487894587",
+      "createdAt": "2026-07-30T09:43:47.125Z",
+      "spinUsed": false,
+      "pointsUsed": 0,
+      "discount": 0
     },
     {
       "token": "A-0004",
       "stallId": "stall-tandoori",
       "items": [
         {
-          "itemId": "item-jamun-shots",
-          "name": "Jamun Shots",
-          "unitPrice": 30,
-          "quantity": 1
+          "itemId": "item-momos",
+          "name": "Momos",
+          "unitPrice": 90,
+          "quantity": 3
         }
       ],
-      "total": 30,
-      "status": "Happiness Disbursed",
+      "total": 258,
+      "status": "Craving Funded",
       "paid": true,
       "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000002",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T09:58:39.851Z",
-      "spinUsed": false
+      "gatewayRef": "MOCK-000001",
+      "customerId": "5487894587",
+      "createdAt": "2026-07-30T11:41:05.972Z",
+      "spinUsed": false,
+      "pointsUsed": 24,
+      "discount": 12
     },
     {
       "token": "A-0005",
       "stallId": "stall-tandoori",
       "items": [
         {
-          "itemId": "item-jamun-shots",
-          "name": "Jamun Shots",
-          "unitPrice": 30,
-          "quantity": 1
+          "itemId": "item-momos",
+          "name": "Momos",
+          "unitPrice": 99,
+          "quantity": 2
         }
       ],
-      "total": 30,
-      "status": "Craving Funded",
+      "total": 198,
+      "status": "Happiness Disbursed",
       "paid": true,
       "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000003",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T10:09:11.210Z",
-      "spinUsed": false
+      "gatewayRef": "MOCK-000001",
+      "customerId": "5487894587",
+      "createdAt": "2026-07-30T13:35:14.693Z",
+      "spinUsed": false,
+      "pointsUsed": 0,
+      "discount": 0
     },
     {
       "token": "A-0006",
       "stallId": "stall-tandoori",
       "items": [
         {
-          "itemId": "item-jamun-shots",
-          "name": "Jamun Shots",
-          "unitPrice": 30,
-          "quantity": 1
+          "itemId": "item-momos",
+          "name": "Momos",
+          "unitPrice": 99,
+          "quantity": 2
         }
       ],
-      "total": 30,
-      "status": "Craving Funded",
+      "total": 195,
+      "status": "Flavor Processing",
       "paid": true,
       "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000004",
+      "gatewayRef": "MOCK-000002",
       "customerId": "7528964393",
-      "createdAt": "2026-07-28T10:09:19.546Z",
-      "spinUsed": false
+      "createdAt": "2026-07-30T13:41:50.743Z",
+      "spinUsed": false,
+      "pointsUsed": 6,
+      "discount": 3
     },
     {
       "token": "A-0007",
       "stallId": "stall-tandoori",
       "items": [
         {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 2
-        },
-        {
           "itemId": "item-jamun-shots",
           "name": "Jamun Shots",
-          "unitPrice": 30,
-          "quantity": 2
-        },
-        {
-          "itemId": "item-ghughara",
-          "name": "Ghughara",
-          "unitPrice": 50,
-          "quantity": 2
+          "unitPrice": 35,
+          "quantity": 1
         }
       ],
-      "total": 280,
+      "total": 35,
       "status": "Craving Funded",
       "paid": true,
       "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000005",
+      "gatewayRef": "MOCK-000003",
       "customerId": "7528964393",
-      "createdAt": "2026-07-28T10:13:38.449Z",
-      "spinUsed": false
+      "createdAt": "2026-07-30T14:12:05.828Z",
+      "spinUsed": false,
+      "pointsUsed": 0,
+      "discount": 0
     },
     {
       "token": "A-0008",
@@ -165,194 +160,50 @@
         {
           "itemId": "item-momos",
           "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 2
-        }
-      ],
-      "total": 120,
-      "status": "Flavor Processing",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000006",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T10:14:25.006Z",
-      "spinUsed": false
-    },
-    {
-      "token": "A-0009",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 2
-        }
-      ],
-      "total": 120,
-      "status": "Flavor Processing",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000007",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T10:25:42.187Z",
-      "spinUsed": false
-    },
-    {
-      "token": "A-0010",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 3
-        }
-      ],
-      "total": 180,
-      "status": "Happiness Disbursed",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000008",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T10:34:27.776Z",
-      "spinUsed": false
-    },
-    {
-      "token": "A-0011",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 2
-        }
-      ],
-      "total": 120,
-      "status": "Happiness Disbursed",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000009",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T10:42:59.195Z",
-      "spinUsed": false
-    },
-    {
-      "token": "A-0012",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 2
+          "unitPrice": 99,
+          "quantity": 1
         },
         {
           "itemId": "item-jamun-shots",
           "name": "Jamun Shots",
-          "unitPrice": 30,
-          "quantity": 3
-        }
-      ],
-      "total": 208.5,
-      "status": "Happiness Disbursed",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000001",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T10:49:13.010Z",
-      "spinUsed": false
-    },
-    {
-      "token": "A-0013",
-      "stallId": "stall-tandoori",
-      "items": [
+          "unitPrice": 35,
+          "quantity": 1
+        },
         {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 60,
-          "quantity": 2
-        }
-      ],
-      "total": 120,
-      "status": "Craving Funded",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000002",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T11:05:51.484Z",
-      "spinUsed": false
-    },
-    {
-      "token": "A-0014",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-jamun-shots",
-          "name": "Jamun Shots",
-          "unitPrice": 30,
-          "quantity": 2
-        }
-      ],
-      "total": 60,
-      "status": "Happiness Disbursed",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000003",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T11:06:07.374Z",
-      "spinUsed": false
-    },
-    {
-      "token": "A-0015",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 60,
+          "itemId": "item-corn-chat",
+          "name": "Corn Chat",
+          "unitPrice": 40,
           "quantity": 1
         }
       ],
-      "total": 60,
+      "total": 174,
       "status": "Craving Funded",
       "paid": true,
       "paymentMethod": "UPI",
       "gatewayRef": "MOCK-000004",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T11:07:32.654Z",
-      "spinUsed": false
-    },
-    {
-      "token": "A-0016",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-jamun-shots",
-          "name": "Jamun Shots",
-          "unitPrice": 30,
-          "quantity": 2
-        }
-      ],
-      "total": 48,
-      "status": "Craving Funded",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000005",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-28T11:08:43.635Z",
-      "spinUsed": false
+      "customerId": "7845785147",
+      "createdAt": "2026-07-30T14:13:16.447Z",
+      "spinUsed": false,
+      "pointsUsed": 0,
+      "discount": 0
     }
   ],
   "wallets": [
     {
       "customerId": "7528964393",
-      "foodCoins": 4
+      "foodCoins": 2
     },
     {
       "customerId": "9512311001",
       "foodCoins": 15
+    },
+    {
+      "customerId": "5487894587",
+      "foodCoins": 44
+    },
+    {
+      "customerId": "7845785147",
+      "foodCoins": 17
     }
   ],
   "referrals": [],
@@ -364,15 +215,62 @@
     {
       "mobile": "9512311001",
       "name": "Ankit"
+    },
+    {
+      "mobile": "5487894587",
+      "name": "homesh"
+    },
+    {
+      "mobile": "7845785147",
+      "name": "homesh"
     }
   ],
   "itemQuantities": {
-    "item-momos": 0,
-    "item-jamun-shots": 68,
-    "item-kiwi-shots": 80,
-    "item-corn-chat": 60,
+    "item-momos": 4,
+    "item-jamun-shots": 2,
+    "item-kiwi-shots": 78,
+    "item-corn-chat": 59,
     "item-ghughara": 38,
     "item-chaas": 100,
-    "item-mitha-pan": 60
-  }
+    "item-mitha-pan": 60,
+    "item-papad": 30
+  },
+  "itemPrices": {
+    "item-momos": 99,
+    "item-jamun-shots": 35,
+    "item-kiwi-shots": 40,
+    "item-corn-chat": 40,
+    "item-ghughara": 50,
+    "item-chaas": 20,
+    "item-mitha-pan": 40,
+    "item-papad": 86
+  },
+  "customItems": [
+    {
+      "name": "Papad",
+      "imageUrl": "https://media.istockphoto.com/id/1265641298/photo/fried-papad.webp?a=1&b=1&s=612x612&w=0&k=20&c=Iai8ikI3Aacz9XM1_Bn0Fmh37iFffegS9Lv50kqJE3Q=",
+      "description": "Fried papad",
+      "rating": 4.5,
+      "availableQuantity": 30,
+      "price": 86,
+      "stallId": "stall-wok",
+      "spice": "medium",
+      "flavor": "savory",
+      "portion": "regular",
+      "id": "item-papad"
+    },
+    {
+      "id": "item-momos",
+      "name": "Momos",
+      "imageUrl": "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80",
+      "description": "Steamed dumplings stuffed with a flavourful veggie filling, served with spicy chutney.",
+      "rating": 4.7,
+      "availableQuantity": 4,
+      "price": 99,
+      "stallId": "stall-tandoori",
+      "spice": "medium",
+      "flavor": "savory",
+      "portion": "regular"
+    }
+  ]
 }

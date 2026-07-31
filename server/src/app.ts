@@ -17,6 +17,7 @@ import express, { type Express, type Request, type Response } from "express";
 import type {
   CartItem,
   Customer,
+  FoodItem,
   NotificationGateway,
   Order,
   OrderContext,
@@ -88,6 +89,16 @@ export function createApp(deps: AppDependencies): Express {
 
   app.use(express.json());
 
+  /**
+   * Enrich an order with the customer's registered name (looked up by the
+   * customerId mobile) so the admin views show a name alongside the number.
+   * The name is an empty string when the customer has no registered name.
+   */
+  const withCustomerName = (order: Order): Order & { customerName: string } => {
+    const customer = store.getCustomer(order.customerId);
+    return { ...order, customerName: customer?.name ?? "" };
+  };
+
   // --- GET /api/stalls/:stallId/menu -------------------------------------
   //
   // Returns only the requested stall's items (Requirement 4.1). When the stall
@@ -136,7 +147,7 @@ export function createApp(deps: AppDependencies): Express {
     if (!isValidMobile(body.mobile)) {
       const errBody: ApiError = {
         error:
-          "A valid mobile number is required (10–15 digits, optional leading +)",
+          "A valid mobile number is required",
         code: "INVALID_MOBILE",
       };
       res.status(400).json(errBody);
@@ -306,6 +317,8 @@ export function createApp(deps: AppDependencies): Express {
         customerId,
         createdAt: new Date().toISOString(),
         spinUsed: false,
+        pointsUsed,
+        discount,
       };
       store.saveOrder(order);
 
@@ -444,7 +457,9 @@ export function createApp(deps: AppDependencies): Express {
   // --- GET /api/admin/orders ----------------------------------------------
   //
   // Lists all orders for a seller/admin, most-recent first (by createdAt).
-  // Optionally filterable to a single stall via `?stallId=`.
+  // Optionally filterable to a single stall via `?stallId=`. Each order is
+  // enriched with the customer's registered name (looked up by the customerId
+  // mobile) so the admin sees a name alongside the number.
   app.get("/api/admin/orders", (req: Request, res: Response): void => {
     const stallId =
       typeof req.query.stallId === "string" ? req.query.stallId : undefined;
@@ -457,7 +472,7 @@ export function createApp(deps: AppDependencies): Express {
     // descending order is chronological descending order.
     orders.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-    res.status(200).json(orders);
+    res.status(200).json(orders.map((o) => withCustomerName(o)));
   });
 
   // --- GET /api/admin/orders/:token ---------------------------------------
@@ -475,7 +490,7 @@ export function createApp(deps: AppDependencies): Express {
       res.status(404).json(errBody);
       return;
     }
-    res.status(200).json(order);
+    res.status(200).json(withCustomerName(order));
   });
 
   // --- GET /api/admin/items -----------------------------------------------
@@ -483,6 +498,264 @@ export function createApp(deps: AppDependencies): Express {
   // Lists all food items across all stalls for stock management.
   app.get("/api/admin/items", (_req: Request, res: Response): void => {
     res.status(200).json(store.getFoodItems());
+  });
+
+  // --- POST /api/admin/items ----------------------------------------------
+  //
+  // Creates a new food item for a stall (an admin "add item" action). Validates
+  // the required fields (name, positive price, existing stallId, non-negative
+  // availableQuantity) and applies sensible defaults for the optional
+  // presentation/recommender attributes. Returns 201 with the created item
+  // (including its server-generated id).
+  //
+  // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
+  // for the festival demo and MUST be placed behind seller authentication in
+  // production.
+  app.post("/api/admin/items", (req: Request, res: Response): void => {
+    const body = (req.body ?? {}) as {
+      name?: unknown;
+      price?: unknown;
+      availableQuantity?: unknown;
+      description?: unknown;
+      imageUrl?: unknown;
+      rating?: unknown;
+      spice?: unknown;
+      flavor?: unknown;
+      portion?: unknown;
+    };
+
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (name === "") {
+      const errBody: ApiError = {
+        error: "name is required",
+        code: "INVALID_ITEM",
+      };
+      res.status(400).json(errBody);
+      return;
+    }
+
+    if (
+      typeof body.price !== "number" ||
+      !Number.isFinite(body.price) ||
+      body.price <= 0
+    ) {
+      const errBody: ApiError = {
+        error: "price must be a positive number",
+        code: "INVALID_PRICE",
+      };
+      res.status(400).json(errBody);
+      return;
+    }
+
+    // New items are assigned to the default (first) stall; the admin UI no
+    // longer chooses a stall. A stall is still required by the data model so
+    // the item shows up in the marketplace/menus.
+    const stallId = store.getStalls()[0]?.id ?? "";
+
+    // availableQuantity is optional; defaults to 0 (out of stock). When
+    // provided it must be a non-negative number.
+    let availableQuantity = 0;
+    if (body.availableQuantity !== undefined) {
+      if (
+        typeof body.availableQuantity !== "number" ||
+        !Number.isFinite(body.availableQuantity) ||
+        body.availableQuantity < 0
+      ) {
+        const errBody: ApiError = {
+          error: "availableQuantity must be a non-negative number",
+          code: "INVALID_QUANTITY",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      availableQuantity = Math.floor(body.availableQuantity);
+    }
+
+    const spice: FoodItem["spice"] =
+      body.spice === "mild" || body.spice === "medium" || body.spice === "hot"
+        ? body.spice
+        : "medium";
+    const flavor: FoodItem["flavor"] =
+      body.flavor === "sweet" || body.flavor === "savory"
+        ? body.flavor
+        : "savory";
+    const portion: FoodItem["portion"] =
+      body.portion === "light" ||
+      body.portion === "regular" ||
+      body.portion === "hearty"
+        ? body.portion
+        : "regular";
+    const rating =
+      typeof body.rating === "number" &&
+      Number.isFinite(body.rating) &&
+      body.rating >= 0 &&
+      body.rating <= 5
+        ? body.rating
+        : 4.5;
+
+    const created = store.createFoodItem({
+      name,
+      imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : "",
+      description: typeof body.description === "string" ? body.description : "",
+      rating,
+      availableQuantity,
+      price: body.price,
+      stallId,
+      spice,
+      flavor,
+      portion,
+    });
+
+    res.status(201).json(created);
+  });
+
+  // --- PATCH /api/admin/items/:itemId -------------------------------------
+  //
+  // Updates an existing food item's editable fields (an admin "edit item"
+  // action). Every field is optional; only the provided, valid fields are
+  // changed. Validates types/ranges the same way the create route does and
+  // rejects an unknown item (404) or an unknown target stall (404). Returns the
+  // updated item.
+  //
+  // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
+  // for the festival demo and MUST be placed behind seller authentication in
+  // production.
+  app.patch("/api/admin/items/:itemId", (req: Request, res: Response): void => {
+    const { itemId } = req.params;
+    const body = (req.body ?? {}) as {
+      name?: unknown;
+      price?: unknown;
+      availableQuantity?: unknown;
+      description?: unknown;
+      imageUrl?: unknown;
+      rating?: unknown;
+      spice?: unknown;
+      flavor?: unknown;
+      portion?: unknown;
+    };
+
+    const existing = store.getFoodItem(itemId);
+    if (!existing) {
+      const errBody: ApiError = {
+        error: "Item not found",
+        code: "ITEM_NOT_FOUND",
+      };
+      res.status(404).json(errBody);
+      return;
+    }
+
+    const patch: Partial<Omit<FoodItem, "id">> = {};
+
+    if (body.name !== undefined) {
+      if (typeof body.name !== "string" || body.name.trim() === "") {
+        const errBody: ApiError = {
+          error: "name must be a non-empty string",
+          code: "INVALID_ITEM",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      patch.name = body.name.trim();
+    }
+
+    if (body.price !== undefined) {
+      if (
+        typeof body.price !== "number" ||
+        !Number.isFinite(body.price) ||
+        body.price <= 0
+      ) {
+        const errBody: ApiError = {
+          error: "price must be a positive number",
+          code: "INVALID_PRICE",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      patch.price = body.price;
+    }
+
+    if (body.availableQuantity !== undefined) {
+      if (
+        typeof body.availableQuantity !== "number" ||
+        !Number.isFinite(body.availableQuantity) ||
+        body.availableQuantity < 0
+      ) {
+        const errBody: ApiError = {
+          error: "availableQuantity must be a non-negative number",
+          code: "INVALID_QUANTITY",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      patch.availableQuantity = Math.floor(body.availableQuantity);
+    }
+
+    if (body.rating !== undefined) {
+      if (
+        typeof body.rating !== "number" ||
+        !Number.isFinite(body.rating) ||
+        body.rating < 0 ||
+        body.rating > 5
+      ) {
+        const errBody: ApiError = {
+          error: "rating must be a number between 0 and 5",
+          code: "INVALID_RATING",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      patch.rating = body.rating;
+    }
+
+    if (body.spice !== undefined) {
+      if (body.spice !== "mild" && body.spice !== "medium" && body.spice !== "hot") {
+        const errBody: ApiError = {
+          error: "spice must be one of mild, medium, hot",
+          code: "INVALID_ITEM",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      patch.spice = body.spice;
+    }
+
+    if (body.flavor !== undefined) {
+      if (body.flavor !== "sweet" && body.flavor !== "savory") {
+        const errBody: ApiError = {
+          error: "flavor must be one of sweet, savory",
+          code: "INVALID_ITEM",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      patch.flavor = body.flavor;
+    }
+
+    if (body.portion !== undefined) {
+      if (
+        body.portion !== "light" &&
+        body.portion !== "regular" &&
+        body.portion !== "hearty"
+      ) {
+        const errBody: ApiError = {
+          error: "portion must be one of light, regular, hearty",
+          code: "INVALID_ITEM",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      patch.portion = body.portion;
+    }
+
+    if (typeof body.description === "string") {
+      patch.description = body.description;
+    }
+    if (typeof body.imageUrl === "string") {
+      patch.imageUrl = body.imageUrl;
+    }
+
+    const updated = store.updateFoodItem(itemId, patch);
+    res.status(200).json(updated);
   });
 
   // --- PATCH /api/admin/items/:itemId/stock -------------------------------
@@ -524,6 +797,81 @@ export function createApp(deps: AppDependencies): Express {
       res.status(200).json(updated);
     }
   );
+
+  // --- PATCH /api/admin/items/:itemId/price -------------------------------
+  //
+  // Updates the price (INR) of a food item. Accepts a JSON body with
+  // `{ price: number }`; the price must be a positive, finite number.
+  //
+  // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
+  // for the festival demo and MUST be placed behind seller authentication in
+  // production.
+  app.patch(
+    "/api/admin/items/:itemId/price",
+    (req: Request, res: Response): void => {
+      const { itemId } = req.params;
+      const body = req.body as { price?: unknown };
+
+      if (
+        body.price === undefined ||
+        typeof body.price !== "number" ||
+        !Number.isFinite(body.price) ||
+        body.price <= 0
+      ) {
+        const errBody: ApiError = {
+          error: "price must be a positive number",
+          code: "INVALID_PRICE",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+
+      const item = store.getFoodItem(itemId);
+      if (!item) {
+        const errBody: ApiError = {
+          error: "Item not found",
+          code: "ITEM_NOT_FOUND",
+        };
+        res.status(404).json(errBody);
+        return;
+      }
+
+      store.setPrice(itemId, body.price);
+      const updated = store.getFoodItem(itemId)!;
+      res.status(200).json(updated);
+    }
+  );
+
+  // --- GET /api/admin/summary ---------------------------------------------
+  //
+  // Returns an overall business summary across all paid orders:
+  //   - totalOrders: count of paid orders
+  //   - totalCollection: sum of paid order totals (INR actually collected)
+  //   - totalRewardPointsUsed: sum of FoodCoins redeemed across all orders
+  //   - totalDiscount: sum of INR discounts given from redeemed reward points
+  //
+  // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
+  // for the festival demo and MUST be placed behind seller authentication in
+  // production.
+  app.get("/api/admin/summary", (_req: Request, res: Response): void => {
+    const paidOrders = store.getOrders().filter((o) => o.paid);
+    const totalOrders = paidOrders.length;
+    const totalCollection = paidOrders.reduce((sum, o) => sum + o.total, 0);
+    const totalRewardPointsUsed = paidOrders.reduce(
+      (sum, o) => sum + (o.pointsUsed ?? 0),
+      0
+    );
+    const totalDiscount = paidOrders.reduce(
+      (sum, o) => sum + (o.discount ?? 0),
+      0
+    );
+    res.status(200).json({
+      totalOrders,
+      totalCollection,
+      totalRewardPointsUsed,
+      totalDiscount,
+    });
+  });
 
   // --- GET /api/wallet/:customerId ----------------------------------------
   //

@@ -36,6 +36,7 @@ const order: OrderResponse = {
   paid: true,
   paymentMethod: "UPI",
   customerId: "+919876543210",
+  customerName: "Asha Rao",
   createdAt: "2024-01-01T10:00:00.000Z",
   spinUsed: false,
 };
@@ -75,6 +76,8 @@ describe("AdminOrdersView listing", () => {
     expect(row).toHaveTextContent("BB-ABC-1");
     expect(row).toHaveTextContent("stall-tandoori");
     expect(row).toHaveTextContent("+919876543210");
+    // The customer's registered name is shown alongside the number.
+    expect(row).toHaveTextContent("Asha Rao");
     expect(screen.getByTestId("admin-status-BB-ABC-1")).toHaveTextContent(
       "Craving Funded"
     );

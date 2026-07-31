@@ -22,6 +22,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
   Customer,
+  FoodItem,
   Order,
   Referral,
   Wallet,
@@ -39,6 +40,14 @@ export interface StoreSnapshot {
   customers: Customer[];
   /** Overridden available quantities keyed by itemId (post-seed mutations). */
   itemQuantities: Record<string, number>;
+  /** Overridden prices (INR) keyed by itemId (post-seed admin edits). */
+  itemPrices: Record<string, number>;
+  /**
+   * Food items created at runtime by the admin (not part of the fixed seed
+   * catalogue). Persisted in full so they are re-added to the store on reload
+   * and survive a server restart.
+   */
+  customItems: FoodItem[];
 }
 
 /** Build an empty snapshot. */
@@ -49,6 +58,8 @@ export function emptySnapshot(): StoreSnapshot {
     referrals: [],
     customers: [],
     itemQuantities: {},
+    itemPrices: {},
+    customItems: [],
   };
 }
 

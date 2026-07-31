@@ -18,6 +18,10 @@ import { ApiClientError, registerCustomer } from "../api/client.js";
 import { useCustomer } from "../customer/CustomerContext.js";
 import { ROUTES } from "../routes.js";
 import type { Customer } from "../../../types/index.js";
+import { isValidMobile } from "../../../domain/mobile.js";
+
+const INDIAN_MOBILE_HELP =
+  "Please enter a valid mobile number";
 
 export interface CustomerFormProps {
   /** Called with the saved customer after a successful registration. */
@@ -53,6 +57,13 @@ export function CustomerForm({
     setMobileError(undefined);
     setError(undefined);
     setSavedName(undefined);
+
+    // Client-side guard: only Indian mobile numbers are accepted.
+    if (!isValidMobile(mobile)) {
+      setMobileError(INDIAN_MOBILE_HELP);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const saved = await registerCustomer({
@@ -65,9 +76,7 @@ export function CustomerForm({
       onSaved?.(saved);
     } catch (err: unknown) {
       if (err instanceof ApiClientError && err.code === "INVALID_MOBILE") {
-        setMobileError(
-          "Please enter a valid mobile number (10–15 digits, optional leading +)."
-        );
+        setMobileError(INDIAN_MOBILE_HELP);
       } else {
         setError(
           err instanceof Error
@@ -91,10 +100,14 @@ export function CustomerForm({
           id="profile-mobile"
           data-testid="profile-mobile"
           type="tel"
-          inputMode="tel"
+          inputMode="numeric"
           autoComplete="tel"
+          placeholder="10-digit mobile (e.g. 9876543210)"
+          maxLength={10}
           value={mobile}
-          onChange={(e) => setMobile(e.target.value)}
+          onChange={(e) =>
+            setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
+          }
           aria-invalid={mobileError ? "true" : undefined}
           aria-describedby={mobileError ? "profile-mobile-error" : undefined}
           required
@@ -161,7 +174,7 @@ export function CustomerForm({
 }
 
 export function ProfileView(): JSX.Element {
-  const { customer } = useCustomer();
+  const { customer, clearCustomer } = useCustomer();
   const navigate = useNavigate();
   const isFirstTime = !customer;
 
@@ -171,13 +184,28 @@ export function ProfileView(): JSX.Element {
     }
   }
 
+  function handleLogout() {
+    clearCustomer();
+    navigate(ROUTES.home);
+  }
+
   return (
     <main className="profile">
       {customer && (
-        <p className="profile-current" data-testid="profile-current">
-          Signed in as <strong>{customer.name || customer.mobile}</strong> (
-          {customer.mobile}).
-        </p>
+        <div className="profile-current" data-testid="profile-current">
+          <p>
+            Signed in as <strong>{customer.name || customer.mobile}</strong> (
+            {customer.mobile}).
+          </p>
+          <button
+            type="button"
+            className="profile-logout"
+            data-testid="profile-logout"
+            onClick={handleLogout}
+          >
+            Log out
+          </button>
+        </div>
       )}
       <CustomerForm onSaved={handleSaved} />
     </main>

@@ -222,6 +222,13 @@ export class Store {
   private referrals: Map<string, Referral> = new Map();
   private customers: Map<string, Customer> = new Map();
 
+  /**
+   * Ids of food items created at runtime (not part of the seed catalogue), so
+   * they can be persisted in full and re-added after a reload. Cleared by
+   * `reset()` along with the rest of the runtime state.
+   */
+  private customItemIds: Set<string> = new Set();
+
   /** The seed this store was constructed with; `reset()` restores to it. */
   private readonly seed: StoreSeed | undefined;
 
@@ -254,6 +261,12 @@ export class Store {
     if (!snapshot) return;
     this.hydrating = true;
     try {
+      // Re-add any runtime-created items BEFORE applying stock/price overrides
+      // so those overrides can target custom items too.
+      for (const item of snapshot.customItems ?? []) {
+        this.foodItems.set(item.id, deepClone(item));
+        this.customItemIds.add(item.id);
+      }
       for (const order of snapshot.orders) this.orders.set(order.token, order);
       for (const wallet of snapshot.wallets) {
         this.wallets.set(wallet.customerId, wallet);
@@ -268,6 +281,11 @@ export class Store {
         snapshot.itemQuantities
       )) {
         this.setAvailableQuantity(itemId, quantity);
+      }
+      for (const [itemId, price] of Object.entries(
+        snapshot.itemPrices ?? {}
+      )) {
+        this.setPrice(itemId, price);
       }
     } finally {
       this.hydrating = false;
@@ -291,6 +309,13 @@ export class Store {
           i.availableQuantity,
         ])
       ),
+      itemPrices: Object.fromEntries(
+        Array.from(this.foodItems.values()).map((i) => [i.id, i.price])
+      ),
+      customItems: Array.from(this.customItemIds)
+        .map((id) => this.foodItems.get(id))
+        .filter((i): i is FoodItem => i !== undefined)
+        .map((i) => deepClone(i)),
     };
     this.persistence.save(snapshot);
   }
@@ -310,6 +335,7 @@ export class Store {
     this.wallets.clear();
     this.referrals.clear();
     this.customers.clear();
+    this.customItemIds.clear();
 
     const stalls = this.seed?.stalls ?? seedStalls();
     const foodItems = this.seed?.foodItems ?? seedFoodItems();
@@ -370,6 +396,68 @@ export class Store {
   }
 
   /**
+   * Create a brand-new food item at runtime (an admin "add item" action) and
+   * register it as a custom item so it is persisted in full and survives a
+   * restart. A unique id is derived from the item name (slugified) with a short
+   * suffix appended when needed to avoid collisions with existing ids. Returns
+   * the stored item (a defensive copy).
+   */
+  createFoodItem(input: Omit<FoodItem, "id">): FoodItem {
+    const id = this.generateItemId(input.name);
+    const item: FoodItem = { ...input, id };
+    this.foodItems.set(id, deepClone(item));
+    this.customItemIds.add(id);
+    this.persist();
+    return deepClone(item);
+  }
+
+  /**
+   * Update an existing food item's editable fields (an admin "edit item"
+   * action). Only the provided fields are changed; `id` is never altered. The
+   * price is floored at 0.01 and the available quantity at 0 (and floored to an
+   * integer) to keep them valid. The edited record is persisted in full (via
+   * the same mechanism as runtime-created items) so it survives a restart,
+   * overriding the seed on reload. Returns the updated item, or `undefined`
+   * when the item is unknown.
+   */
+  updateFoodItem(
+    itemId: string,
+    patch: Partial<Omit<FoodItem, "id">>
+  ): FoodItem | undefined {
+    const existing = this.foodItems.get(itemId);
+    if (!existing) return undefined;
+
+    const updated: FoodItem = { ...existing, ...patch, id: existing.id };
+    updated.price = Math.max(0.01, updated.price);
+    updated.availableQuantity = Math.max(0, Math.floor(updated.availableQuantity));
+
+    this.foodItems.set(itemId, deepClone(updated));
+    // Persist the full edited record so non-stock/price edits (name, image,
+    // attributes, …) also survive a restart. Reusing the custom-item channel
+    // means the edited record is re-applied on top of the seed during hydrate.
+    this.customItemIds.add(itemId);
+    this.persist();
+    return deepClone(updated);
+  }
+
+  /** Derive a unique `item-<slug>` id from a name, disambiguating collisions. */
+  private generateItemId(name: string): string {
+    const slug =
+      name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "item";
+    let candidate = `item-${slug}`;
+    let n = 2;
+    while (this.foodItems.has(candidate)) {
+      candidate = `item-${slug}-${n}`;
+      n += 1;
+    }
+    return candidate;
+  }
+
+  /**
    * Set the available quantity of an item (e.g. after a purchase). No-op when
    * the item is unknown; the clamped-to-zero floor prevents negative stock.
    */
@@ -377,6 +465,18 @@ export class Store {
     const item = this.foodItems.get(itemId);
     if (!item) return;
     item.availableQuantity = Math.max(0, Math.floor(quantity));
+    this.persist();
+  }
+
+  /**
+   * Set the price (INR) of an item (e.g. an admin price change). No-op when
+   * the item is unknown; the price is floored at 0.01 rupee so it stays a
+   * positive amount. The change is persisted so it survives a restart.
+   */
+  setPrice(itemId: string, price: number): void {
+    const item = this.foodItems.get(itemId);
+    if (!item) return;
+    item.price = Math.max(0.01, price);
     this.persist();
   }
 

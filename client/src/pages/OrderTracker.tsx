@@ -2,57 +2,39 @@
  * OrderTracker — live order-status tracking for an Order_Token (Req 6.3, 6.4).
  *
  * Reads the `:token` route param and polls `getOrder` on the shared ~3s
- * interval (via `usePolling`), rendering the current Order_Status label. The
- * four status values — "Craving Funded", "Flavor Processing",
+ * interval (via `usePolling`), rendering the current Order_Status. The four
+ * status values — "Craving Funded", "Flavor Processing",
  * "Taste Ready for Pickup", and "Happiness Disbursed" — are surfaced verbatim
  * from the server-authoritative order state, so the displayed status always
  * matches the stored status (Req 6.3) and refreshes well inside the 5-second
  * freshness window (Req 6.4).
  *
- * An operator "Advance order" control issues a POST via `advanceOrder`
- * (`POST /api/orders/:token/advance`) — never a plain link/GET navigation to
- * that POST-only endpoint — and refreshes the tracked status on success.
+ * The status is presented as a horizontal progress bar of all lifecycle steps,
+ * with completed steps checked, the current step highlighted as active, and
+ * upcoming steps dimmed. This is a read-only customer view — advancing the
+ * order is an operator action performed from the admin Orders page.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { advanceOrder, getOrder } from "../api/client.js";
+import { getOrder } from "../api/client.js";
 import type { OrderResponse } from "../api/client.js";
 import { usePolling } from "../hooks/usePolling.js";
+import { ORDER_STATUS_SEQUENCE } from "../../../types/index.js";
 
 export function OrderTracker(): JSX.Element {
   const params = useParams<{ token: string }>();
   const token = params.token ?? "";
 
-  const fetchOrder = useCallback(
-    () => getOrder(token),
-    [token]
-  );
+  const fetchOrder = useCallback(() => getOrder(token), [token]);
 
-  const { data, error, loading, refresh } = usePolling<OrderResponse>(
-    fetchOrder,
-    { enabled: token !== "" }
-  );
+  const { data, error, loading } = usePolling<OrderResponse>(fetchOrder, {
+    enabled: token !== "",
+  });
 
-  const [advancing, setAdvancing] = useState(false);
-  const [advanceError, setAdvanceError] = useState(false);
-
-  // Operator control: advance the order to its next status via a POST to
-  // `/api/orders/:token/advance` (never a GET/link navigation), then refresh
-  // the tracked status from the server-authoritative state.
-  const handleAdvance = useCallback(async () => {
-    if (token === "" || advancing) return;
-    setAdvancing(true);
-    setAdvanceError(false);
-    try {
-      await advanceOrder(token);
-      refresh();
-    } catch {
-      setAdvanceError(true);
-    } finally {
-      setAdvancing(false);
-    }
-  }, [token, advancing, refresh]);
+  const currentIndex = data
+    ? ORDER_STATUS_SEQUENCE.indexOf(data.status)
+    : -1;
 
   return (
     <main className="order-tracker">
@@ -67,30 +49,37 @@ export function OrderTracker(): JSX.Element {
         </p>
       )}
 
-      {loading && !data && !error && (
-        <p role="status">Loading order status…</p>
-      )}
+      {loading && !data && !error && <p role="status">Loading order status…</p>}
 
       {data && (
         <>
           <p className="order-tracker-status">
-            Status:{" "}
-            <strong data-testid="order-status">{data.status}</strong>
+            Status: <strong data-testid="order-status">{data.status}</strong>
           </p>
-          <button
-            type="button"
-            className="order-tracker-advance"
-            data-testid="order-advance"
-            onClick={handleAdvance}
-            disabled={advancing || data.status === "Happiness Disbursed"}
-          >
-            {advancing ? "Advancing…" : "Advance order"}
-          </button>
-          {advanceError && (
-            <p role="alert" className="order-tracker-advance-error">
-              We couldn&apos;t advance the order. Please try again.
-            </p>
-          )}
+
+          <ol className="order-steps" data-testid="order-steps" aria-label="Order progress">
+            {ORDER_STATUS_SEQUENCE.map((status, index) => {
+              const state =
+                index < currentIndex
+                  ? "done"
+                  : index === currentIndex
+                    ? "active"
+                    : "upcoming";
+              return (
+                <li
+                  key={status}
+                  className={`order-step order-step--${state}`}
+                  aria-current={state === "active" ? "step" : undefined}
+                  data-testid={`order-step-${index}`}
+                >
+                  <span className="order-step-marker">
+                    {state === "done" ? "✓" : index + 1}
+                  </span>
+                  <span className="order-step-label">{status}</span>
+                </li>
+              );
+            })}
+          </ol>
         </>
       )}
     </main>

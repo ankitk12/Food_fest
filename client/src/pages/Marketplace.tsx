@@ -15,6 +15,7 @@ import { ROUTES } from "../routes.js";
 import { useCart } from "../cart/CartContext.js";
 import { usePolling } from "../hooks/usePolling.js";
 import { FoodItemCard } from "./FoodItemCard.js";
+import { formatINR } from "../format.js";
 
 export function Marketplace(): JSX.Element {
   const { addItem, cart, increment, decrement, removeItem } = useCart();
@@ -42,13 +43,18 @@ export function Marketplace(): JSX.Element {
   }
 
   const menuItems = items ?? [];
+  const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0);
+  const cartTotal = cart.reduce(
+    (sum, line) => sum + line.unitPrice * line.quantity,
+    0
+  );
 
   return (
     <main className="marketplace">
       <header className="marketplace-header">
         <h1>Marketplace</h1>
         <Link to={ROUTES.cart} className="marketplace-cart-link">
-          Cart ({cart.reduce((sum, line) => sum + line.quantity, 0)})
+          Cart ({cartCount})
         </Link>
       </header>
 
@@ -81,6 +87,20 @@ export function Marketplace(): JSX.Element {
             );
           })}
         </ul>
+      )}
+
+      {cartCount > 0 && (
+        <div className="cart-bar" role="region" aria-label="Cart summary">
+          <div className="cart-bar-info">
+            <span className="cart-bar-count" data-testid="cart-bar-count">
+              {cartCount} {cartCount === 1 ? "item" : "items"}
+            </span>
+            <span className="cart-bar-total">{formatINR(cartTotal)}</span>
+          </div>
+          <Link to={ROUTES.checkout} className="cart-bar-checkout">
+            Checkout →
+          </Link>
+        </div>
       )}
     </main>
   );

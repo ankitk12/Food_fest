@@ -15,10 +15,13 @@ import type {
   CartItem,
   Customer,
   FoodItem,
+  Flavor,
   Metrics,
+  Portion,
   Preferences,
   RecommendedItem,
   Referral,
+  Spice,
   TrendingEntry,
   Wallet,
   OrderStatus,
@@ -93,6 +96,8 @@ export interface OrderResponse {
   paymentMethod: "UPI" | "other";
   gatewayRef?: string;
   customerId: string;
+  /** The customer's registered name (empty string when unknown). */
+  customerName?: string;
   createdAt: string;
   spinUsed: boolean;
   spinReward?: SpinReward;
@@ -211,6 +216,55 @@ export function getAdminItems(): Promise<FoodItem[]> {
   return request<FoodItem[]>("/admin/items");
 }
 
+/** Request body for creating a new food item via the admin add-item form. */
+export interface CreateItemRequest {
+  name: string;
+  price: number;
+  availableQuantity?: number;
+  description?: string;
+  imageUrl?: string;
+  rating?: number;
+  spice?: Spice;
+  flavor?: Flavor;
+  portion?: Portion;
+}
+
+/** POST /api/admin/items — create a new food item; returns the created item. */
+export function createItem(req: CreateItemRequest): Promise<FoodItem> {
+  return postJson<FoodItem>("/admin/items", req);
+}
+
+/** Fields that can be edited on an existing item (all optional). */
+export type UpdateItemRequest = Partial<CreateItemRequest>;
+
+/**
+ * PATCH /api/admin/items/:itemId — update an existing food item's fields.
+ * Only the provided fields are changed. Returns the updated item.
+ */
+export function updateItem(
+  itemId: string,
+  patch: UpdateItemRequest
+): Promise<FoodItem> {
+  return request<FoodItem>(`/admin/items/${encodeURIComponent(itemId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+/** Overall business summary across all paid orders. */
+export interface AdminSummary {
+  totalOrders: number;
+  totalCollection: number;
+  totalRewardPointsUsed: number;
+  /** Total INR discount given from redeemed reward points across all orders. */
+  totalDiscount: number;
+}
+
+/** GET /api/admin/summary — overall totals across all paid orders. */
+export function getAdminSummary(): Promise<AdminSummary> {
+  return request<AdminSummary>("/admin/summary");
+}
+
 /** PATCH /api/admin/items/:itemId/stock — update item stock level. */
 export function updateItemStock(
   itemId: string,
@@ -219,6 +273,17 @@ export function updateItemStock(
   return request<FoodItem>(
     `/admin/items/${encodeURIComponent(itemId)}/stock`,
     { method: "PATCH", body: JSON.stringify({ availableQuantity }) }
+  );
+}
+
+/** PATCH /api/admin/items/:itemId/price — update item price (INR). */
+export function updateItemPrice(
+  itemId: string,
+  price: number
+): Promise<FoodItem> {
+  return request<FoodItem>(
+    `/admin/items/${encodeURIComponent(itemId)}/price`,
+    { method: "PATCH", body: JSON.stringify({ price }) }
   );
 }
 

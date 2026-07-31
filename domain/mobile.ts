@@ -11,9 +11,11 @@
  *   - Strip spaces, dashes, parentheses, and dots (common formatting noise).
  *   - Preserve a single leading "+" (international dialling prefix) when present.
  *
- * Validity rules:
- *   - After normalization the digits must number between 10 and 15 (E.164-ish),
- *     with an optional single leading "+".
+ * Validity rules (India only):
+ *   - The number must be a valid Indian mobile number: a 10-digit national
+ *     number whose first digit is 6, 7, 8, or 9.
+ *   - An optional Indian country code (`+91` / `91`) or a leading trunk `0`
+ *     prefix is accepted and ignored when checking the 10-digit national part.
  */
 
 /**
@@ -31,10 +33,27 @@ export function normalizeMobile(raw: unknown): string {
 }
 
 /**
- * True when `raw` normalizes to a plausible mobile number: 10–15 digits with an
- * optional single leading "+".
+ * Reduce a normalized number to its 10-digit Indian national part by removing
+ * an Indian country code (`+91` / `91`) or a leading trunk `0`, but only when
+ * the length indicates such a prefix is present (so a genuine 10-digit number
+ * is never truncated).
+ */
+function toIndianNational(normalized: string): string {
+  let digits = normalized.startsWith("+") ? normalized.slice(1) : normalized;
+  if (digits.length === 12 && digits.startsWith("91")) {
+    digits = digits.slice(2); // strip "91" country code
+  } else if (digits.length === 11 && digits.startsWith("0")) {
+    digits = digits.slice(1); // strip trunk "0"
+  }
+  return digits;
+}
+
+/**
+ * True when `raw` is a valid Indian mobile number: a 10-digit national number
+ * starting with 6–9, optionally prefixed with the Indian country code
+ * (`+91` / `91`) or a trunk `0`.
  */
 export function isValidMobile(raw: unknown): boolean {
-  const normalized = normalizeMobile(raw);
-  return /^\+?\d{10,15}$/.test(normalized);
+  const national = toIndianNational(normalizeMobile(raw));
+  return /^[6-9]\d{9}$/.test(national);
 }

@@ -1,90 +1,73 @@
 /**
- * Unit tests for HomePage content and navigation routing.
+ * Unit tests for the redesigned Invest-A-Bite HomePage.
  *
- * Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6
+ * Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 4.1, 5.1, 6.1
  */
 
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { HomePage } from "./HomePage.js";
-import { ROUTES } from "../routes.js";
 
-/**
- * Render HomePage inside a MemoryRouter whose sibling routes render
- * identifiable content, so a button click can be verified by asserting the
- * destination content appears.
- */
 function renderHome(): void {
   render(
-    <MemoryRouter initialEntries={[ROUTES.home]}>
-      <Routes>
-        <Route path={ROUTES.home} element={<HomePage />} />
-        <Route
-          path={ROUTES.marketplace}
-          element={<div>MARKETPLACE PAGE</div>}
-        />
-        <Route path={ROUTES.trending} element={<div>TRENDING PAGE</div>} />
-        <Route path={ROUTES.investor} element={<div>INVESTOR PAGE</div>} />
-      </Routes>
+    <MemoryRouter initialEntries={["/"]}>
+      <HomePage />
     </MemoryRouter>
   );
 }
 
-describe("HomePage content", () => {
-  it("renders the hero heading (Req 1.1)", () => {
+describe("HomePage — Invest-A-Bite redesign", () => {
+  it("renders the HeroSection with 'Now trading' badge (Req 3.1)", () => {
+    renderHome();
+    expect(screen.getByText("Now trading")).toBeInTheDocument();
+  });
+
+  it("renders the Invest-A-Bite title (Req 3.2)", () => {
     renderHome();
     expect(
-      screen.getByRole("heading", { name: "Welcome to ByteBites" })
+      screen.getByRole("heading", { name: /Invest.*A.*Bite/i })
     ).toBeInTheDocument();
   });
 
-  it("renders the hero subheading (Req 1.1)", () => {
+  it("renders the tagline (Req 3.3)", () => {
     renderHome();
     expect(
-      screen.getByText("Where food meets fintech innovation.")
+      screen.getByText("High returns on every bite. Zero risk, all flavour.")
     ).toBeInTheDocument();
   });
 
-  it("renders the tagline (Req 1.6)", () => {
+  it("renders the price range '₹15–80' (Req 3.4)", () => {
     renderHome();
-    expect(
-      screen.getByText("Invest in Taste. Earn in Happiness.")
-    ).toBeInTheDocument();
+    expect(screen.getByText("₹15–80")).toBeInTheDocument();
   });
 
-  it("renders the three navigation buttons (Req 1.2)", () => {
+  it("renders '▲ Market open' status (Req 3.5)", () => {
     renderHome();
-    expect(
-      screen.getByRole("button", { name: "Order Now" })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Trending Foods" })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Investor Dashboard" })
-    ).toBeInTheDocument();
-  });
-});
-
-describe("HomePage navigation", () => {
-  it("navigates to the Marketplace when Order Now is clicked (Req 1.3)", () => {
-    renderHome();
-    fireEvent.click(screen.getByRole("button", { name: "Order Now" }));
-    expect(screen.getByText("MARKETPLACE PAGE")).toBeInTheDocument();
+    expect(screen.getByText("▲ Market open")).toBeInTheDocument();
   });
 
-  it("navigates to the Trending Board when Trending Foods is clicked (Req 1.4)", () => {
+  it("renders the TickerMarquee with food price ticker label (Req 4.1)", () => {
     renderHome();
-    fireEvent.click(screen.getByRole("button", { name: "Trending Foods" }));
-    expect(screen.getByText("TRENDING PAGE")).toBeInTheDocument();
+    expect(screen.getByLabelText("Food price ticker")).toBeInTheDocument();
   });
 
-  it("navigates to the Investor Section when Investor Dashboard is clicked (Req 1.5)", () => {
+  it("renders menu section headings (Req 6.1)", () => {
     renderHome();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Investor Dashboard" })
-    );
-    expect(screen.getByText("INVESTOR PAGE")).toBeInTheDocument();
+    expect(screen.getByText("Blue-Chip Mojitos")).toBeInTheDocument();
+    expect(screen.getByText("High-Yield Shots")).toBeInTheDocument();
+    expect(screen.getByText("Hot Assets")).toBeInTheDocument();
+    expect(screen.getByText("Cool Dividends")).toBeInTheDocument();
+    expect(screen.getByText("Chaat Portfolio")).toBeInTheDocument();
+  });
+
+  it("renders gallery items from the food image gallery (Req 5.1)", () => {
+    renderHome();
+    // Gallery renders food images with alt text matching the reference set
+    expect(screen.getByAltText("Momos")).toBeInTheDocument();
+    expect(screen.getByAltText("Basket Chaat")).toBeInTheDocument();
+    expect(screen.getByAltText("Mint Mojito")).toBeInTheDocument();
+    // The old "Pani Puri" gallery label should no longer be present
+    expect(screen.queryByText(/Pani Puri/)).toBeNull();
   });
 });

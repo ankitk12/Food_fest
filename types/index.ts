@@ -79,6 +79,8 @@ export interface Order {
   createdAt: string; // ISO timestamp
   spinUsed: boolean;
   spinReward?: SpinReward; // the reward drawn for this order's single spin, once used
+  pointsUsed?: number; // FoodCoins (reward points) redeemed against this order at checkout
+  discount?: number; // INR discount applied from redeemed reward points at checkout
 }
 
 /**

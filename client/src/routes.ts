@@ -24,6 +24,7 @@ export const ROUTES = {
   orderHistory: "/order-history",
   admin: "/admin",
   stock: "/admin/stock",
+  summary: "/admin/summary",
 } as const;
 
 /** Build the marketplace menu path for a specific stall. */

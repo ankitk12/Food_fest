@@ -27,31 +27,6 @@ export interface FoodItemCardProps {
   onRemove?: (itemId: string) => void;
 }
 
-/**
- * Render a 0..5 star rating as filled/empty star glyphs alongside the numeric
- * value, so the rating is conveyed both visually and as text. The rating is
- * rounded to the nearest whole star for the glyph representation while the
- * exact value is shown numerically.
- */
-function StarRating({ rating }: { rating: number }): JSX.Element {
-  const clamped = Math.max(0, Math.min(5, rating));
-  const filled = Math.round(clamped);
-  const stars = "★".repeat(filled) + "☆".repeat(5 - filled);
-  return (
-    <span
-      className="food-card-rating"
-      data-testid="food-card-rating"
-      role="img"
-      aria-label={`Rating: ${clamped} out of 5 stars`}
-    >
-      <span aria-hidden="true" className="food-card-stars">
-        {stars}
-      </span>
-      <span className="food-card-rating-value">{clamped} / 5</span>
-    </span>
-  );
-}
-
 export function FoodItemCard({
   item,
   onAddToCart,

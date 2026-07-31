@@ -9,13 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import * as api from "../api/client.js";
 import type { OrderResponse } from "../api/client.js";
@@ -26,11 +20,10 @@ vi.mock("../api/client.js", async () => {
   const actual = await vi.importActual<typeof import("../api/client.js")>(
     "../api/client.js"
   );
-  return { ...actual, getOrder: vi.fn(), advanceOrder: vi.fn() };
+  return { ...actual, getOrder: vi.fn() };
 });
 
 const getOrderMock = vi.mocked(api.getOrder);
-const advanceOrderMock = vi.mocked(api.advanceOrder);
 
 function order(status: OrderResponse["status"]): OrderResponse {
   return {
@@ -59,7 +52,6 @@ function renderTracker(): void {
 
 beforeEach(() => {
   getOrderMock.mockReset();
-  advanceOrderMock.mockReset();
 });
 
 afterEach(() => {
@@ -90,33 +82,35 @@ describe("OrderTracker status label (Req 6.3)", () => {
   });
 });
 
-describe("OrderTracker advance control (Req 6.2)", () => {
-  it("advances the order via a POST (advanceOrder) rather than a GET navigation", async () => {
-    getOrderMock
-      .mockResolvedValueOnce(order("Craving Funded"))
-      .mockResolvedValue(order("Flavor Processing"));
-    advanceOrderMock.mockResolvedValue(order("Flavor Processing"));
+describe("OrderTracker progress steps (read-only)", () => {
+  it("renders all four lifecycle steps with the current one active", async () => {
+    getOrderMock.mockResolvedValue(order("Flavor Processing"));
 
     renderTracker();
 
     await screen.findByTestId("order-status");
-    fireEvent.click(screen.getByTestId("order-advance"));
 
-    await waitFor(() =>
-      expect(advanceOrderMock).toHaveBeenCalledWith("BB-TOKEN-123")
+    // All four steps are rendered.
+    expect(screen.getByTestId("order-step-0")).toHaveTextContent("Craving Funded");
+    expect(screen.getByTestId("order-step-1")).toHaveTextContent("Flavor Processing");
+    expect(screen.getByTestId("order-step-2")).toHaveTextContent(
+      "Taste Ready for Pickup"
     );
-    await waitFor(() =>
-      expect(screen.getByTestId("order-status")).toHaveTextContent("Flavor Processing")
+    expect(screen.getByTestId("order-step-3")).toHaveTextContent(
+      "Happiness Disbursed"
     );
+
+    // The current status step is marked active (aria-current="step").
+    expect(screen.getByTestId("order-step-1")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByTestId("order-step-0")).not.toHaveAttribute("aria-current");
   });
 
-  it("disables the advance control once the order is Happiness Disbursed", async () => {
-    getOrderMock.mockResolvedValue(order("Happiness Disbursed"));
+  it("does not render an advance control (read-only customer view)", async () => {
+    getOrderMock.mockResolvedValue(order("Craving Funded"));
 
     renderTracker();
 
     await screen.findByTestId("order-status");
-    expect(screen.getByTestId("order-advance")).toBeDisabled();
-    expect(advanceOrderMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("order-advance")).toBeNull();
   });
 });

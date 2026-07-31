@@ -38,9 +38,9 @@ export function SiteHeader(): JSX.Element {
             ☰
           </button>
 
-          <Link to={ROUTES.home} className="site-brand" aria-label="ByteBites home">
+          <Link to={ROUTES.home} className="site-brand" aria-label="Invest-A-Bite home">
             <span className="site-brand-mark">🍽</span>
-            <span className="site-brand-name">ByteBites</span>
+            <span className="site-brand-name">Invest-A-Bite</span>
           </Link>
 
           {/* Desktop nav — hidden on mobile */}
@@ -65,12 +65,17 @@ export function SiteHeader(): JSX.Element {
             )}
             {isAdmin && (
               <NavLink to={ROUTES.admin} className="site-nav-link">
-                Admin
+                Orders
               </NavLink>
             )}
             {isAdmin && (
               <NavLink to={ROUTES.stock} className="site-nav-link">
                 Stock
+              </NavLink>
+            )}
+            {isAdmin && (
+              <NavLink to={ROUTES.summary} className="site-nav-link">
+                Summary
               </NavLink>
             )}
           </nav>
@@ -99,7 +104,7 @@ export function SiteHeader(): JSX.Element {
       {/* Mobile sidebar drawer */}
       <aside className={`sidebar ${sidebarOpen ? "sidebar--open" : ""}`} aria-label="Navigation menu">
         <div className="sidebar-header">
-          <span className="sidebar-brand">🍽 ByteBites</span>
+          <span className="sidebar-brand">🍽 Invest-A-Bite</span>
           <button
             type="button"
             className="sidebar-close"
@@ -138,12 +143,17 @@ export function SiteHeader(): JSX.Element {
           )}
           {isAdmin && (
             <NavLink to={ROUTES.admin} className="sidebar-nav-link" onClick={closeSidebar}>
-              📊 Admin
+              📊 Orders
             </NavLink>
           )}
           {isAdmin && (
             <NavLink to={ROUTES.stock} className="sidebar-nav-link" onClick={closeSidebar}>
               📦 Stock
+            </NavLink>
+          )}
+          {isAdmin && (
+            <NavLink to={ROUTES.summary} className="sidebar-nav-link" onClick={closeSidebar}>
+              📈 Summary
             </NavLink>
           )}
           {!isAdmin && (
