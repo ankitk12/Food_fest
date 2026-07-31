@@ -1,12 +1,11 @@
 // Prisma schema for the ByteBites server.
 //
-// The server keeps its canonical state in an in-memory `Store` and persists a
-// single serializable snapshot of its mutable runtime state (orders, wallets,
-// referrals, customers, item stock/price overrides, and admin-created items).
-// That snapshot maps cleanly to one JSON-backed row here, so switching from the
-// JSON file to Postgres does not require a relational rewrite of the domain.
+// The server's mutable runtime state is persisted across these relational
+// tables (instead of a single JSON blob). The in-memory Store still produces a
+// full snapshot on each mutation; the Prisma persistence adapter maps that
+// snapshot to/from these tables.
 //
-// Set database_PRISMA_DATABASE_URL to your Prisma Postgres (or any Postgres) connection string.
+// Set DATABASE_URL to your Prisma Postgres (or any Postgres) connection string.
 
 generator client {
   provider = "prisma-client-js"
@@ -17,9 +16,65 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// A single-row document holding the full Store snapshot as JSON.
-model Snapshot {
-  id        String   @id @default("singleton")
-  data      Json
-  updatedAt DateTime @updatedAt
+/// A registered customer, keyed by their normalized mobile number.
+model Customer {
+  mobile String  @id
+  email  String?
+  name   String
+}
+
+/// A customer's FoodCoins wallet balance.
+model Wallet {
+  customerId String @id
+  foodCoins  Int
+}
+
+/// A customer's referral record (their link + who they've already credited).
+model Referral {
+  customerId          String   @id
+  link                String
+  creditedReferredIds String[]
+}
+
+/// A placed order. Line items are stored as JSON (small, order-local data).
+model Order {
+  token         String  @id
+  stallId       String
+  items         Json
+  total         Float
+  status        String
+  paid          Boolean
+  paymentMethod String
+  gatewayRef    String?
+  customerId    String
+  createdAt     String
+  spinUsed      Boolean
+  spinReward    String?
+  pointsUsed    Int?
+  discount      Float?
+}
+
+/// Per-item stock/price overrides applied on top of the seeded catalogue.
+model ItemState {
+  itemId   String @id
+  quantity Int
+  price    Float
+}
+
+
+/// The food catalogue. Holds both the seeded items and any items the admin
+/// creates at runtime (custom items are upserted into this same table so the
+/// catalogue is the single source of truth).
+model FoodItem {
+  id                String @id
+  name              String
+  imageUrl          String
+  description       String
+  rating            Float
+  availableQuantity Int
+  price             Float
+  stallId           String
+  spice             String
+  flavor            String
+  portion           String
 }

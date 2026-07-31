@@ -48,6 +48,12 @@ export interface StoreSnapshot {
    * and survive a server restart.
    */
   customItems: FoodItem[];
+  /**
+   * Ids of food items the admin has deleted. Persisted so a deletion of a
+   * seeded item stays deleted across a restart (the seed catalogue is otherwise
+   * re-created on every construction).
+   */
+  deletedItemIds: string[];
 }
 
 /** Build an empty snapshot. */
@@ -60,6 +66,7 @@ export function emptySnapshot(): StoreSnapshot {
     itemQuantities: {},
     itemPrices: {},
     customItems: [],
+    deletedItemIds: [],
   };
 }
 

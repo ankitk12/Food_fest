@@ -16,7 +16,7 @@
  */
 
 import { createApp } from "./app.js";
-import { Store, DEFAULT_DATA_FILE } from "./store.js";
+import { Store, DEFAULT_DATA_FILE, seedStalls, seedFoodItems } from "./store.js";
 import { MockGateway } from "./gateways/mock-gateway.js";
 import { PaytmGateway } from "./gateways/paytm-gateway.js";
 import { MockNotificationGateway } from "./notifications/mock-notification-gateway.js";
@@ -48,8 +48,21 @@ async function buildStore(): Promise<Store> {
     const { PrismaPersistence } = await import("./prisma-persistence.js");
     const persistence = new PrismaPersistence();
     await persistence.init();
+
+    // Render the base food catalogue from the database. Bootstrap the table
+    // from the built-in defaults the first time (when it's empty).
+    let foodItems = await persistence.loadFoodCatalog();
+    if (foodItems.length === 0) {
+      foodItems = seedFoodItems();
+      await persistence.seedFoodCatalog(foodItems);
+      console.log(`Seeded ${foodItems.length} food items into the catalogue table`);
+    }
+
     console.log("Persistence: Prisma/Postgres");
-    return new Store(undefined, { persistence });
+    return new Store(
+      { stalls: seedStalls(), foodItems },
+      { persistence }
+    );
   }
 
   console.log("Persistence: JSON file (set DATABASE_URL to use Postgres)");

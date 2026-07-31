@@ -44,7 +44,7 @@ import {
  * constant) guarantees every reset produces independent objects that later
  * mutations cannot leak back into the seed definition.
  */
-function seedStalls(): Stall[] {
+export function seedStalls(): Stall[] {
   return [
     { id: "stall-tandoori", name: "Tandoori Tech", qrSlug: "tandoori-tech" },
     { id: "stall-wok", name: "Wok & Roll", qrSlug: "wok-and-roll" },
@@ -53,105 +53,15 @@ function seedStalls(): Stall[] {
 }
 
 /**
- * Build a fresh copy of the seed food items. Items span all three seed stalls
- * and carry realistic data: names, images, descriptions, ratings within 0..5,
- * available quantities (including a sold-out item), prices in INR, and the
- * spice/flavor/portion attributes used by the AI Chef recommender.
+ * Build a fresh copy of the seed food items.
+ *
+ * The catalogue no longer ships with any static/demo items: it starts empty and
+ * is populated entirely at runtime by the admin (via the "Add New Item" flow in
+ * Stock Management), with those items persisted in full so they survive a
+ * restart.
  */
-function seedFoodItems(): FoodItem[] {
-  return [
-    {
-      id: "item-momos",
-      name: "Momos",
-      imageUrl: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80",
-      description: "Steamed dumplings stuffed with a flavourful veggie filling, served with spicy chutney.",
-      rating: 4.7,
-      availableQuantity: 50,
-      price: 60,
-      stallId: "stall-tandoori",
-      spice: "medium",
-      flavor: "savory",
-      portion: "regular",
-    },
-    {
-      id: "item-jamun-shots",
-      name: "Jamun Shots",
-      imageUrl: "https://images.unsplash.com/photo-1600271886742-f049cd451bba?auto=format&fit=crop&w=600&q=80",
-      description: "Chilled jamun berry shots — tangy, sweet, and refreshing.",
-      rating: 4.5,
-      availableQuantity: 80,
-      price: 30,
-      stallId: "stall-tandoori",
-      spice: "mild",
-      flavor: "sweet",
-      portion: "light",
-    },
-    {
-      id: "item-kiwi-shots",
-      name: "Kiwi Shots",
-      imageUrl: "https://images.unsplash.com/photo-1585059895524-72f2d3abbe18?auto=format&fit=crop&w=600&q=80",
-      description: "Fresh kiwi fruit shots bursting with tropical flavour.",
-      rating: 4.4,
-      availableQuantity: 80,
-      price: 35,
-      stallId: "stall-tandoori",
-      spice: "mild",
-      flavor: "sweet",
-      portion: "light",
-    },
-    {
-      id: "item-corn-chat",
-      name: "Corn Chat",
-      imageUrl: "https://images.unsplash.com/photo-1630384060421-cb20d0e0649d?auto=format&fit=crop&w=600&q=80",
-      description: "Spiced sweet corn tossed with onion, tomato, lemon, and chaat masala.",
-      rating: 4.3,
-      availableQuantity: 60,
-      price: 40,
-      stallId: "stall-tandoori",
-      spice: "medium",
-      flavor: "savory",
-      portion: "light",
-    },
-    {
-      id: "item-ghughara",
-      name: "Ghughara",
-      imageUrl: "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=600&q=80",
-      description: "Crispy deep-fried pastry pockets filled with a sweet coconut-sesame stuffing.",
-      rating: 4.6,
-      availableQuantity: 40,
-      price: 50,
-      stallId: "stall-tandoori",
-      spice: "mild",
-      flavor: "sweet",
-      portion: "regular",
-    },
-    {
-      id: "item-chaas",
-      name: "Chaas",
-      imageUrl: "https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=600&q=80",
-      description: "Cool spiced buttermilk with cumin and fresh coriander — the perfect thirst quencher.",
-      rating: 4.2,
-      availableQuantity: 100,
-      price: 20,
-      stallId: "stall-tandoori",
-      spice: "mild",
-      flavor: "savory",
-      portion: "light",
-    },
-    {
-      id: "item-mitha-pan",
-      name: "Mitha Pan",
-      imageUrl: "https://images.unsplash.com/photo-1590080876351-941da357a4e4?auto=format&fit=crop&w=600&q=80",
-      description: "Sweet betel leaf loaded with gulkand, tutti-frutti, and aromatic fennel.",
-      rating: 4.8,
-      availableQuantity: 60,
-      price: 30,
-      stallId: "stall-tandoori",
-      spice: "mild",
-      flavor: "sweet",
-      portion: "light",
-    },
-  ];
+export function seedFoodItems(): FoodItem[] {
+  return [];
 }
 
 // --- Deep-copy helper ------------------------------------------------------
@@ -229,6 +139,13 @@ export class Store {
    */
   private customItemIds: Set<string> = new Set();
 
+  /**
+   * Ids of food items the admin has deleted at runtime. Tracked so a deletion
+   * of a seeded item is re-applied after the seed catalogue is re-created on
+   * reload, keeping deletions durable. Cleared by `reset()`.
+   */
+  private deletedItemIds: Set<string> = new Set();
+
   /** The seed this store was constructed with; `reset()` restores to it. */
   private readonly seed: StoreSeed | undefined;
 
@@ -266,6 +183,13 @@ export class Store {
       for (const item of snapshot.customItems ?? []) {
         this.foodItems.set(item.id, deepClone(item));
         this.customItemIds.add(item.id);
+      }
+      // Re-apply deletions on top of the freshly seeded catalogue so a deleted
+      // item (seeded or custom) stays gone after a restart.
+      for (const deletedId of snapshot.deletedItemIds ?? []) {
+        this.foodItems.delete(deletedId);
+        this.customItemIds.delete(deletedId);
+        this.deletedItemIds.add(deletedId);
       }
       for (const order of snapshot.orders) this.orders.set(order.token, order);
       for (const wallet of snapshot.wallets) {
@@ -316,6 +240,7 @@ export class Store {
         .map((id) => this.foodItems.get(id))
         .filter((i): i is FoodItem => i !== undefined)
         .map((i) => deepClone(i)),
+      deletedItemIds: Array.from(this.deletedItemIds),
     };
     this.persistence.save(snapshot);
   }
@@ -336,6 +261,7 @@ export class Store {
     this.referrals.clear();
     this.customers.clear();
     this.customItemIds.clear();
+    this.deletedItemIds.clear();
 
     const stalls = this.seed?.stalls ?? seedStalls();
     const foodItems = this.seed?.foodItems ?? seedFoodItems();
@@ -407,8 +333,25 @@ export class Store {
     const item: FoodItem = { ...input, id };
     this.foodItems.set(id, deepClone(item));
     this.customItemIds.add(id);
+    // A newly created item is live again; clear any prior deletion for this id.
+    this.deletedItemIds.delete(id);
     this.persist();
     return deepClone(item);
+  }
+
+  /**
+   * Delete a food item at runtime (an admin "delete item" action). Removes it
+   * from the live catalogue and records the deletion so it stays gone after a
+   * restart, even for seeded items (which are otherwise re-created on reload).
+   * Returns true when an item was removed, false when the id was unknown.
+   */
+  deleteFoodItem(itemId: string): boolean {
+    const existed = this.foodItems.delete(itemId);
+    if (!existed) return false;
+    this.customItemIds.delete(itemId);
+    this.deletedItemIds.add(itemId);
+    this.persist();
+    return true;
   }
 
   /**

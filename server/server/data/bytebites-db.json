@@ -1,232 +1,16 @@
 {
   "orders": [
-    {
-      "token": "A-0001",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-jamun-shots",
-          "name": "Jamun Shots",
-          "unitPrice": 35,
-          "quantity": 4
-        }
-      ],
-      "total": 132,
-      "status": "Craving Funded",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000001",
-      "customerId": "5487894587",
-      "createdAt": "2026-07-28T13:49:20.517Z",
-      "spinUsed": false,
-      "pointsUsed": 16
-    },
-    {
-      "token": "A-0002",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 90,
-          "quantity": 2
-        }
-      ],
-      "total": 173.5,
-      "status": "Happiness Disbursed",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000001",
-      "customerId": "5487894587",
-      "createdAt": "2026-07-28T13:55:31.061Z",
-      "spinUsed": false,
-      "pointsUsed": 13,
-      "discount": 6.5
-    },
-    {
-      "token": "A-0003",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-jamun-shots",
-          "name": "Jamun Shots",
-          "unitPrice": 35,
-          "quantity": 2
-        }
-      ],
-      "total": 70,
-      "status": "Craving Funded",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000002",
-      "customerId": "5487894587",
-      "createdAt": "2026-07-30T09:43:47.125Z",
-      "spinUsed": false,
-      "pointsUsed": 0,
-      "discount": 0
-    },
-    {
-      "token": "A-0004",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 90,
-          "quantity": 3
-        }
-      ],
-      "total": 258,
-      "status": "Craving Funded",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000001",
-      "customerId": "5487894587",
-      "createdAt": "2026-07-30T11:41:05.972Z",
-      "spinUsed": false,
-      "pointsUsed": 24,
-      "discount": 12
-    },
-    {
-      "token": "A-0005",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 99,
-          "quantity": 2
-        }
-      ],
-      "total": 198,
-      "status": "Happiness Disbursed",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000001",
-      "customerId": "5487894587",
-      "createdAt": "2026-07-30T13:35:14.693Z",
-      "spinUsed": false,
-      "pointsUsed": 0,
-      "discount": 0
-    },
-    {
-      "token": "A-0006",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 99,
-          "quantity": 2
-        }
-      ],
-      "total": 195,
-      "status": "Flavor Processing",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000002",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-30T13:41:50.743Z",
-      "spinUsed": false,
-      "pointsUsed": 6,
-      "discount": 3
-    },
-    {
-      "token": "A-0007",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-jamun-shots",
-          "name": "Jamun Shots",
-          "unitPrice": 35,
-          "quantity": 1
-        }
-      ],
-      "total": 35,
-      "status": "Craving Funded",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000003",
-      "customerId": "7528964393",
-      "createdAt": "2026-07-30T14:12:05.828Z",
-      "spinUsed": false,
-      "pointsUsed": 0,
-      "discount": 0
-    },
-    {
-      "token": "A-0008",
-      "stallId": "stall-tandoori",
-      "items": [
-        {
-          "itemId": "item-momos",
-          "name": "Momos",
-          "unitPrice": 99,
-          "quantity": 1
-        },
-        {
-          "itemId": "item-jamun-shots",
-          "name": "Jamun Shots",
-          "unitPrice": 35,
-          "quantity": 1
-        },
-        {
-          "itemId": "item-corn-chat",
-          "name": "Corn Chat",
-          "unitPrice": 40,
-          "quantity": 1
-        }
-      ],
-      "total": 174,
-      "status": "Craving Funded",
-      "paid": true,
-      "paymentMethod": "UPI",
-      "gatewayRef": "MOCK-000004",
-      "customerId": "7845785147",
-      "createdAt": "2026-07-30T14:13:16.447Z",
-      "spinUsed": false,
-      "pointsUsed": 0,
-      "discount": 0
-    }
+    
   ],
   "wallets": [
-    {
-      "customerId": "7528964393",
-      "foodCoins": 2
-    },
-    {
-      "customerId": "9512311001",
-      "foodCoins": 15
-    },
-    {
-      "customerId": "5487894587",
-      "foodCoins": 44
-    },
-    {
-      "customerId": "7845785147",
-      "foodCoins": 17
-    }
+
   ],
   "referrals": [],
   "customers": [
-    {
-      "mobile": "7528964393",
-      "name": "homesh"
-    },
-    {
-      "mobile": "9512311001",
-      "name": "Ankit"
-    },
-    {
-      "mobile": "5487894587",
-      "name": "homesh"
-    },
-    {
-      "mobile": "7845785147",
-      "name": "homesh"
-    }
+    
   ],
   "itemQuantities": {
-    "item-momos": 4,
+    "item-momos": 2,
     "item-jamun-shots": 2,
     "item-kiwi-shots": 78,
     "item-corn-chat": 59,
@@ -265,7 +49,7 @@
       "imageUrl": "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80",
       "description": "Steamed dumplings stuffed with a flavourful veggie filling, served with spicy chutney.",
       "rating": 4.7,
-      "availableQuantity": 4,
+      "availableQuantity": 2,
       "price": 99,
       "stallId": "stall-tandoori",
       "spice": "medium",

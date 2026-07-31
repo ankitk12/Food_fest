@@ -13,6 +13,7 @@ import {
   updateItemStock,
   createItem,
   updateItem,
+  deleteItem,
   type CreateItemRequest,
   type UpdateItemRequest,
 } from "../api/client.js";
@@ -65,6 +66,20 @@ function StockPanel(): JSX.Element {
     }
   }
 
+  async function handleDelete(item: FoodItem): Promise<void> {
+    const confirmed = window.confirm(
+      `Delete “${item.name}”? This removes it from the marketplace and can’t be undone.`
+    );
+    if (!confirmed) return;
+    setUpdatingId(item.id);
+    try {
+      await deleteItem(item.id);
+      refresh();
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   return (
     <main className="admin">
       <header className="admin-header">
@@ -100,6 +115,7 @@ function StockPanel(): JSX.Element {
                 onMarkOutOfStock={handleMarkOutOfStock}
                 onRestoreStock={handleRestoreStock}
                 onEdit={() => setEditingItem(item)}
+                onDelete={() => handleDelete(item)}
               />
             );
           })}
@@ -483,6 +499,7 @@ interface StockCardProps {
   onMarkOutOfStock: (itemId: string) => void;
   onRestoreStock: (itemId: string, quantity: number) => void;
   onEdit: () => void;
+  onDelete: () => void;
 }
 
 function StockCard({
@@ -492,6 +509,7 @@ function StockCard({
   onMarkOutOfStock,
   onRestoreStock,
   onEdit,
+  onDelete,
 }: StockCardProps): JSX.Element {
   const [restoreQty, setRestoreQty] = useState("50");
 
@@ -502,14 +520,25 @@ function StockCard({
     >
       <div className="stock-card-header">
         <h3 className="stock-card-name">{item.name}</h3>
-        <button
-          type="button"
-          className="stock-card-edit-toggle"
-          data-testid={`stock-edit-toggle-${item.id}`}
-          onClick={onEdit}
-        >
-          Edit
-        </button>
+        <div className="stock-card-header-actions">
+          <button
+            type="button"
+            className="stock-card-edit-toggle"
+            data-testid={`stock-edit-toggle-${item.id}`}
+            onClick={onEdit}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className="stock-card-delete-toggle"
+            data-testid={`stock-delete-${item.id}`}
+            onClick={onDelete}
+            disabled={busy}
+          >
+            {busy ? "…" : "Delete"}
+          </button>
+        </div>
       </div>
 
       <div className="stock-card-info">

@@ -71,14 +71,27 @@ describe("JSON-file persistence round-trip", () => {
     expect(reloaded.getCustomer("9876543210")).toEqual(customer);
   });
 
-  it("recovers item-stock overrides after a restart", () => {
+  it("recovers a runtime-created item and its stock overrides after a restart", () => {
     const dataFile = tempDataFile();
 
+    // The catalogue starts empty, so create an item at runtime first.
     const store = new Store(undefined, { persist: true, dataFile });
-    const item = store.getFoodItems()[0];
+    const item = store.createFoodItem({
+      name: "Persisted Item",
+      imageUrl: "https://example.com/item.jpg",
+      description: "A runtime-created item.",
+      rating: 4.5,
+      availableQuantity: 10,
+      price: 50,
+      stallId: "stall-tandoori",
+      spice: "mild",
+      flavor: "sweet",
+      portion: "light",
+    });
     store.setAvailableQuantity(item.id, 3);
 
     const reloaded = new Store(undefined, { persist: true, dataFile });
+    expect(reloaded.getFoodItem(item.id)?.name).toBe("Persisted Item");
     expect(reloaded.getFoodItem(item.id)?.availableQuantity).toBe(3);
   });
 

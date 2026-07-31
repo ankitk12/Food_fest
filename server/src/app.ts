@@ -842,6 +842,29 @@ export function createApp(deps: AppDependencies): Express {
     }
   );
 
+  // --- DELETE /api/admin/items/:itemId ------------------------------------
+  //
+  // Deletes a food item (an admin "delete item" action). Responds 404 with the
+  // consistent `{ error, code }` shape when the item is unknown, otherwise 204
+  // No Content. The deletion is persisted so it survives a restart.
+  //
+  // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
+  // for the festival demo and MUST be placed behind seller authentication in
+  // production.
+  app.delete("/api/admin/items/:itemId", (req: Request, res: Response): void => {
+    const { itemId } = req.params;
+    const deleted = store.deleteFoodItem(itemId);
+    if (!deleted) {
+      const errBody: ApiError = {
+        error: "Item not found",
+        code: "ITEM_NOT_FOUND",
+      };
+      res.status(404).json(errBody);
+      return;
+    }
+    res.status(204).end();
+  });
+
   // --- GET /api/admin/summary ---------------------------------------------
   //
   // Returns an overall business summary across all paid orders:

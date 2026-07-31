@@ -251,6 +251,17 @@ export function updateItem(
   });
 }
 
+/**
+ * DELETE /api/admin/items/:itemId — delete a food item. Resolves on success
+ * (204 No Content); throws `ApiClientError` with code `ITEM_NOT_FOUND` when the
+ * item is unknown.
+ */
+export function deleteItem(itemId: string): Promise<void> {
+  return request<void>(`/admin/items/${encodeURIComponent(itemId)}`, {
+    method: "DELETE",
+  });
+}
+
 /** Overall business summary across all paid orders. */
 export interface AdminSummary {
   totalOrders: number;
