@@ -65,6 +65,11 @@ export interface CheckoutRequest {
   items: CartItem[];
   /** Number of reward points to redeem (optional). 2 points = ₹1 discount. */
   redeemPoints?: number;
+  /**
+   * How the customer is paying. "UPI" runs the digital payment gateway; "cash"
+   * is collected at the counter and skips the gateway. Defaults to "UPI".
+   */
+  paymentMethod?: "UPI" | "cash";
 }
 
 export interface CheckoutResponse {
@@ -93,7 +98,7 @@ export interface OrderResponse {
   total: number;
   status: OrderStatus;
   paid: boolean;
-  paymentMethod: "UPI" | "other";
+  paymentMethod: "UPI" | "cash" | "other";
   gatewayRef?: string;
   customerId: string;
   /** The customer's registered name (empty string when unknown). */
@@ -178,6 +183,19 @@ export function getMenu(stallId: string): Promise<FoodItem[]> {
 /** GET /api/menu — all food items across all stalls. */
 export function getAllItems(): Promise<FoodItem[]> {
   return request<FoodItem[]>("/menu");
+}
+
+/** Public runtime configuration exposed by the server (read from its env). */
+export interface AppConfig {
+  /** Merchant UPI VPA used to build the checkout QR / payment intent. */
+  merchantVpa: string;
+  /** Merchant display name shown in the UPI payment intent / QR. */
+  merchantName: string;
+}
+
+/** GET /api/config — non-secret runtime config (e.g. merchant UPI identity). */
+export function getConfig(): Promise<AppConfig> {
+  return request<AppConfig>("/config");
 }
 
 /** POST /api/checkout — initiate payment and create an order on success. */
@@ -319,6 +337,17 @@ export function getCustomerOrders(mobile: string): Promise<OrderResponse[]> {
 export function advanceOrder(token: string): Promise<OrderResponse> {
   return postJson<OrderResponse>(
     `/orders/${encodeURIComponent(token)}/advance`,
+    {}
+  );
+}
+
+/**
+ * POST /api/orders/:token/mark-paid — mark an order's payment as received
+ * (e.g. staff confirming a cash payment collected at the counter).
+ */
+export function markOrderPaid(token: string): Promise<OrderResponse> {
+  return postJson<OrderResponse>(
+    `/orders/${encodeURIComponent(token)}/mark-paid`,
     {}
   );
 }

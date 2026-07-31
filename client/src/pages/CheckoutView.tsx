@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ApiClientError, checkout, getWallet } from "../api/client.js";
+import { ApiClientError, checkout, getConfig, getWallet } from "../api/client.js";
 import type { CheckoutResponse } from "../api/client.js";
 import { useCart } from "../cart/CartContext.js";
 import { useCustomer } from "../customer/CustomerContext.js";
@@ -21,8 +21,65 @@ import { CustomerForm } from "./ProfileView.js";
 type CheckoutState =
   | { status: "idle" }
   | { status: "paying" }
-  | { status: "success"; result: CheckoutResponse; mobile: string }
+  | { status: "success"; result: CheckoutResponse; mobile: string; method: "UPI" | "cash" }
   | { status: "failed"; message: string };
+
+/**
+ * Merchant UPI identity used to build the payment intent / QR. Fetched at
+ * runtime from the server (`GET /api/config`), which reads it from its
+ * environment (e.g. Vercel Project Environment Variables: `MERCHANT_VPA`,
+ * `MERCHANT_NAME`). These demo defaults are used until the config loads.
+ */
+const DEFAULT_MERCHANT: MerchantConfig = {
+  vpa: "invest-a-bite@upi",
+  name: "Invest-A-Bite",
+};
+
+interface MerchantConfig {
+  vpa: string;
+  name: string;
+}
+
+/** Build the shared UPI intent query string (pa, pn, am, cu, tn). */
+function buildUpiParams(amount: number, merchant: MerchantConfig): string {
+  const params = new URLSearchParams({
+    pa: merchant.vpa,
+    pn: merchant.name,
+    am: amount.toFixed(2),
+    cu: "INR",
+    tn: `${merchant.name} order`,
+  });
+  return params.toString();
+}
+
+/**
+ * Build a UPI deep-link for a given app scheme. The generic `upi://pay` scheme
+ * opens the OS app chooser (used for the QR and "Other"), while the
+ * app-specific schemes below open that app directly.
+ */
+function buildUpiUri(
+  amount: number,
+  merchant: MerchantConfig,
+  scheme = "upi://pay"
+): string {
+  return `${scheme}?${buildUpiParams(amount, merchant)}`;
+}
+
+/**
+ * The UPI apps offered as quick-launch buttons. Each carries its own deep-link
+ * scheme so tapping it opens that app directly (on a device with it installed)
+ * instead of the generic chooser:
+ *   - Google Pay → `tez://upi/pay`
+ *   - PhonePe    → `phonepe://pay`
+ *   - Paytm      → `paytmmp://pay`
+ *   - Other      → `upi://pay` (system chooser)
+ */
+const UPI_APPS: ReadonlyArray<{ label: string; emoji: string; scheme: string }> = [
+  { label: "Google Pay", emoji: "🟢", scheme: "tez://upi/pay" },
+  { label: "PhonePe", emoji: "🟣", scheme: "phonepe://pay" },
+  { label: "Paytm", emoji: "🔵", scheme: "paytmmp://pay" },
+  { label: "Other UPI app", emoji: "🏦", scheme: "upi://pay" },
+];
 
 export function CheckoutView(): JSX.Element {
   const { cart, total, clearCart } = useCart();
@@ -31,6 +88,17 @@ export function CheckoutView(): JSX.Element {
   const [state, setState] = useState<CheckoutState>({ status: "idle" });
   const [rewardBalance, setRewardBalance] = useState(0);
   const [useRewards, setUseRewards] = useState(false);
+  // When true, the UPI payment screen (QR + app buttons) is shown before the
+  // customer confirms they've paid.
+  const [showUpi, setShowUpi] = useState(false);
+  // Merchant UPI identity, loaded from the server's runtime config.
+  const [merchant, setMerchant] = useState<MerchantConfig>(DEFAULT_MERCHANT);
+
+  useEffect(() => {
+    getConfig()
+      .then((cfg) => setMerchant({ vpa: cfg.merchantVpa, name: cfg.merchantName }))
+      .catch(() => setMerchant(DEFAULT_MERCHANT));
+  }, []);
 
   // Fetch the user's reward points balance
   useEffect(() => {
@@ -46,7 +114,7 @@ export function CheckoutView(): JSX.Element {
   const discount = useRewards ? maxDiscount : 0;
   const amountToPay = total - discount;
 
-  async function handlePay(): Promise<void> {
+  async function handlePay(method: "UPI" | "cash"): Promise<void> {
     if (!customer) return;
     const stallId = DEMO_STALL_ID;
     setState({ status: "paying" });
@@ -56,9 +124,11 @@ export function CheckoutView(): JSX.Element {
         customerId: customer.mobile,
         items: toCartItems(cart),
         redeemPoints: useRewards ? pointsToUse : undefined,
+        paymentMethod: method,
       });
       clearCart();
-      setState({ status: "success", result, mobile: customer.mobile });
+      setShowUpi(false);
+      setState({ status: "success", result, mobile: customer.mobile, method });
       navigate(ROUTES.orderHistory);
     } catch (err: unknown) {
       let message: string;
@@ -84,10 +154,25 @@ export function CheckoutView(): JSX.Element {
   }
 
   if (state.status === "success") {
-    const { token, coinsEarned, notified, discount: appliedDiscount } = state.result;
+    const { token, coinsEarned, notified, discount: appliedDiscount, total: paidTotal } =
+      state.result;
+    const isCash = state.method === "cash";
     return (
       <main className="checkout">
-        <h1>Payment successful</h1>
+        <h1>Order placed</h1>
+        <p className="checkout-cash-note" data-testid="checkout-payment-note">
+          {isCash ? (
+            <>
+              Please pay {formatINR(paidTotal)} in cash at the counter.
+            </>
+          ) : (
+            <>
+              Complete the {formatINR(paidTotal)} UPI payment using the QR / your
+              UPI app.
+            </>
+          )}{" "}
+          Your payment is marked <strong>pending</strong> until staff confirm it.
+        </p>
         <p className="checkout-token-label">Your order token:</p>
         <p className="checkout-token" data-testid="order-token">
           <strong>{token}</strong>
@@ -168,11 +253,9 @@ export function CheckoutView(): JSX.Element {
           </div>
         )}
 
-        {useRewards && (
-          <p className="checkout-final-amount">
-            Amount to pay: <strong>{formatINR(amountToPay)}</strong>
-          </p>
-        )}
+        <p className="checkout-final-amount" data-testid="checkout-amount">
+          Amount to pay: <strong>{formatINR(amountToPay)}</strong>
+        </p>
       </div>
 
       <p className="checkout-customer" data-testid="checkout-customer">
@@ -185,17 +268,110 @@ export function CheckoutView(): JSX.Element {
         </p>
       )}
 
-      <button
-        type="button"
-        className="checkout-pay"
-        onClick={() => void handlePay()}
-        disabled={state.status === "paying"}
-      >
-        {state.status === "paying"
-          ? "Processing…"
-          : `Pay ${formatINR(amountToPay)} with UPI`}
-      </button>
+      {showUpi ? (
+        <UpiPayPanel
+          amount={amountToPay}
+          merchant={merchant}
+          paying={state.status === "paying"}
+          onConfirm={() => void handlePay("UPI")}
+          onBack={() => setShowUpi(false)}
+        />
+      ) : (
+        <fieldset className="checkout-pay-methods" data-testid="checkout-pay-methods">
+          <legend>Choose how to pay</legend>
+          <button
+            type="button"
+            className="checkout-pay checkout-pay--upi"
+            onClick={() => setShowUpi(true)}
+            disabled={state.status === "paying"}
+          >
+            Pay with UPI
+          </button>
+          <button
+            type="button"
+            className="checkout-pay checkout-pay--cash"
+            onClick={() => void handlePay("cash")}
+            disabled={state.status === "paying"}
+          >
+            {state.status === "paying" ? "Processing…" : "Pay with Cash"}
+          </button>
+        </fieldset>
+      )}
     </main>
+  );
+}
+
+interface UpiPayPanelProps {
+  amount: number;
+  merchant: MerchantConfig;
+  paying: boolean;
+  onConfirm: () => void;
+  onBack: () => void;
+}
+
+/**
+ * UpiPayPanel — the UPI payment screen: a scannable QR encoding the payment
+ * intent for `amount`, quick-launch buttons for popular UPI apps, and a
+ * "payment done" confirmation that finalizes the order.
+ */
+function UpiPayPanel({ amount, merchant, paying, onConfirm, onBack }: UpiPayPanelProps): JSX.Element {
+  const upiUri = buildUpiUri(amount, merchant);
+  // The QR image is rendered by a public QR service from the UPI intent string.
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+    upiUri
+  )}`;
+
+  return (
+    <section className="upi-pay" data-testid="upi-pay-panel">
+      <h2 className="upi-pay-title">Pay {formatINR(amount)} via UPI</h2>
+      <p className="upi-pay-hint">
+        Scan the QR with any UPI app, or tap your app below.
+      </p>
+
+      <div className="upi-pay-qr">
+        <img
+          src={qrSrc}
+          width={240}
+          height={240}
+          alt={`UPI QR code to pay ${formatINR(amount)} to ${merchant.name}`}
+          data-testid="upi-qr"
+        />
+        <p className="upi-pay-vpa">{merchant.vpa}</p>
+      </div>
+
+      <div className="upi-pay-apps" data-testid="upi-apps">
+        {UPI_APPS.map((app) => (
+          <a
+            key={app.label}
+            className="upi-pay-app"
+            href={buildUpiUri(amount, merchant, app.scheme)}
+            rel="noreferrer"
+          >
+            <span aria-hidden="true">{app.emoji}</span> {app.label}
+          </a>
+        ))}
+      </div>
+
+      <div className="checkout-pay-methods">
+        <button
+          type="button"
+          className="checkout-pay"
+          data-testid="upi-confirm"
+          onClick={onConfirm}
+          disabled={paying}
+        >
+          {paying ? "Processing…" : "I've paid — confirm order"}
+        </button>
+        <button
+          type="button"
+          className="checkout-pay checkout-pay--cash"
+          onClick={onBack}
+          disabled={paying}
+        >
+          Back
+        </button>
+      </div>
+    </section>
   );
 }
 

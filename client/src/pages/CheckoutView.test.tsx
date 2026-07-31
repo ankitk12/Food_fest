@@ -105,7 +105,9 @@ describe("CheckoutView token display (Req 5.5)", () => {
 
     renderCheckout();
     fireEvent.click(screen.getByRole("button", { name: "seed-cart" }));
+    // Selecting UPI opens the QR screen; confirming finalizes the order.
     fireEvent.click(screen.getByRole("button", { name: "Pay with UPI" }));
+    fireEvent.click(await screen.findByTestId("upi-confirm"));
 
     // After successful payment, navigates to the order history page.
     const historyPage = await screen.findByTestId("order-history-page");
@@ -129,11 +131,15 @@ describe("CheckoutView customer identity", () => {
     renderCheckout();
     fireEvent.click(screen.getByRole("button", { name: "seed-cart" }));
     fireEvent.click(await screen.findByRole("button", { name: "Pay with UPI" }));
+    fireEvent.click(await screen.findByTestId("upi-confirm"));
 
     // After successful checkout, navigates to order history.
     await screen.findByTestId("order-history-page");
     expect(checkoutMock).toHaveBeenCalledWith(
-      expect.objectContaining({ customerId: "+919876543210" })
+      expect.objectContaining({
+        customerId: "+919876543210",
+        paymentMethod: "UPI",
+      })
     );
   });
 });
@@ -147,6 +153,7 @@ describe("CheckoutView payment failure (Req 5.3)", () => {
     renderCheckout();
     fireEvent.click(screen.getByRole("button", { name: "seed-cart" }));
     fireEvent.click(await screen.findByRole("button", { name: "Pay with UPI" }));
+    fireEvent.click(await screen.findByTestId("upi-confirm"));
 
     expect(await screen.findByTestId("payment-error")).toBeInTheDocument();
     // Cart retained: the seeded line is still present.

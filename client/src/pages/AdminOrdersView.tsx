@@ -15,6 +15,7 @@ import {
   getAllItems,
   registerCustomer,
   checkout,
+  markOrderPaid,
   ApiClientError,
 } from "../api/client.js";
 import type { OrderResponse } from "../api/client.js";
@@ -75,6 +76,22 @@ function AdminOrdersPanel(): JSX.Element {
 
   const [advancingToken, setAdvancingToken] = useState<string | null>(null);
   const [advanceError, setAdvanceError] = useState<string | undefined>(undefined);
+  const [markingToken, setMarkingToken] = useState<string | null>(null);
+
+  const handleMarkPaid = useCallback(
+    async (token: string): Promise<void> => {
+      setMarkingToken(token);
+      try {
+        await markOrderPaid(token);
+        refresh();
+      } catch {
+        setAdvanceError("We couldn't update that payment. Please try again.");
+      } finally {
+        setMarkingToken(null);
+      }
+    },
+    [refresh]
+  );
 
   const handleAdvance = useCallback(
     async (token: string): Promise<void> => {
@@ -112,6 +129,9 @@ function AdminOrdersPanel(): JSX.Element {
     <main className="admin">
       <header className="admin-header">
         <h1>Order Management</h1>
+        <p className="admin-note" data-testid="admin-note">
+          Staff view — order and payment actions are unauthenticated in this demo.
+        </p>
       </header>
 
       {/* Sub-tabs */}
@@ -206,9 +226,47 @@ function AdminOrdersPanel(): JSX.Element {
                   {order.customerId}
                 </div>
 
+                <div className="admin-order-card-stall">
+                  🏪 {order.stallId}
+                </div>
+
                 <div className="admin-order-card-items">
                   {itemsSummary(order.items)}
                 </div>
+
+                <div
+                  className="admin-order-payment"
+                  data-testid={`admin-payment-${order.token}`}
+                >
+                  <span
+                    className={`admin-pay-method admin-pay-method--${
+                      order.paymentMethod === "cash" ? "cash" : "upi"
+                    }`}
+                  >
+                    {order.paymentMethod === "cash" ? "💵 Cash" : "📱 UPI"}
+                  </span>
+                  <span
+                    className={`admin-pay-status admin-pay-status--${
+                      order.paid ? "received" : "pending"
+                    }`}
+                  >
+                    {order.paid ? "Received" : "Pending"}
+                  </span>
+                </div>
+
+                {!order.paid && (
+                  <button
+                    type="button"
+                    className="admin-mark-paid"
+                    data-testid={`admin-mark-paid-${order.token}`}
+                    onClick={() => void handleMarkPaid(order.token)}
+                    disabled={markingToken === order.token}
+                  >
+                    {markingToken === order.token
+                      ? "Updating…"
+                      : "Mark payment received"}
+                  </button>
+                )}
 
                 <div className="admin-order-card-footer">
                   <span className="admin-order-card-total">

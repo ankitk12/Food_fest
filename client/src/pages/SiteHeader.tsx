@@ -46,7 +46,7 @@ export function SiteHeader(): JSX.Element {
           {/* Desktop nav — hidden on mobile */}
           <nav className="site-nav site-nav-desktop" aria-label="Primary">
             {!isAdmin && (
-              <NavLink to={ROUTES.marketplace} className="site-nav-link">
+              <NavLink to={ROUTES.home} end className="site-nav-link">
                 Order
               </NavLink>
             )}
@@ -124,7 +124,7 @@ export function SiteHeader(): JSX.Element {
 
         <nav className="sidebar-nav">
           {!isAdmin && (
-            <NavLink to={ROUTES.marketplace} className="sidebar-nav-link" onClick={closeSidebar}>
+            <NavLink to={ROUTES.home} end className="sidebar-nav-link" onClick={closeSidebar}>
               🛍️ Order
             </NavLink>
           )}

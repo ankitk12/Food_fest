@@ -1,21 +1,61 @@
 /**
  * Unit tests for the redesigned Invest-A-Bite HomePage.
  *
- * Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 4.1, 5.1, 6.1
+ * The HomePage now embeds direct ordering (live menu + cart), so tests provide
+ * a CartProvider and a mocked catalogue.
+ *
+ * Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 4.1
  */
 
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import type { FoodItem } from "../../../types/index.js";
+import * as api from "../api/client.js";
+import { CartProvider } from "../cart/CartContext.js";
 import { HomePage } from "./HomePage.js";
+
+const sampleItem: FoodItem = {
+  id: "item-1",
+  name: "Paneer Tikka",
+  imageUrl: "https://example.com/p.jpg",
+  description: "Char-grilled cottage cheese.",
+  rating: 4.6,
+  availableQuantity: 40,
+  price: 180,
+  stallId: "stall-1",
+  spice: "medium",
+  flavor: "savory",
+  portion: "regular",
+};
+
+vi.mock("../api/client.js", async () => {
+  const actual = await vi.importActual<typeof import("../api/client.js")>(
+    "../api/client.js"
+  );
+  return { ...actual, getAllItems: vi.fn() };
+});
+
+const getAllItemsMock = vi.mocked(api.getAllItems);
 
 function renderHome(): void {
   render(
-    <MemoryRouter initialEntries={["/"]}>
-      <HomePage />
-    </MemoryRouter>
+    <CartProvider>
+      <MemoryRouter initialEntries={["/"]}>
+        <HomePage />
+      </MemoryRouter>
+    </CartProvider>
   );
 }
+
+beforeEach(() => {
+  getAllItemsMock.mockReset();
+  getAllItemsMock.mockResolvedValue([sampleItem]);
+});
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("HomePage — Invest-A-Bite redesign", () => {
   it("renders the HeroSection with 'Now trading' badge (Req 3.1)", () => {
@@ -47,27 +87,18 @@ describe("HomePage — Invest-A-Bite redesign", () => {
     expect(screen.getByText("▲ Market open")).toBeInTheDocument();
   });
 
-  it("renders the TickerMarquee with food price ticker label (Req 4.1)", () => {
+  it("renders the TickerMarquee, driven by the live menu (Req 4.1)", async () => {
     renderHome();
-    expect(screen.getByLabelText("Food price ticker")).toBeInTheDocument();
+    // The ticker reflects the loaded menu, so it appears after the fetch.
+    expect(
+      await screen.findByLabelText("Food price ticker")
+    ).toBeInTheDocument();
   });
 
-  it("renders menu section headings (Req 6.1)", () => {
+  it("renders the direct ordering section", () => {
     renderHome();
-    expect(screen.getByText("Blue-Chip Mojitos")).toBeInTheDocument();
-    expect(screen.getByText("High-Yield Shots")).toBeInTheDocument();
-    expect(screen.getByText("Hot Assets")).toBeInTheDocument();
-    expect(screen.getByText("Cool Dividends")).toBeInTheDocument();
-    expect(screen.getByText("Chaat Portfolio")).toBeInTheDocument();
-  });
-
-  it("renders gallery items from the food image gallery (Req 5.1)", () => {
-    renderHome();
-    // Gallery renders food images with alt text matching the reference set
-    expect(screen.getByAltText("Momos")).toBeInTheDocument();
-    expect(screen.getByAltText("Basket Chaat")).toBeInTheDocument();
-    expect(screen.getByAltText("Mint Mojito")).toBeInTheDocument();
-    // The old "Pani Puri" gallery label should no longer be present
-    expect(screen.queryByText(/Pani Puri/)).toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Order Now" })
+    ).toBeInTheDocument();
   });
 });

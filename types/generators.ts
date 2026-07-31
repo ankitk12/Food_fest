@@ -189,6 +189,7 @@ export function todayIsoTimestampArb(): fc.Arbitrary<string> {
 
 export const paymentMethodArb: fc.Arbitrary<PaymentMethod> = fc.constantFrom(
   "UPI",
+  "cash",
   "other"
 );
 

@@ -20,7 +20,6 @@ import type {
   FoodItem,
   NotificationGateway,
   Order,
-  OrderContext,
   PaymentGateway,
 } from "../../types/index.js";
 import type { Store } from "./store.js";
@@ -39,7 +38,12 @@ import type { Preferences, Referral } from "../../types/index.js";
 /** Collaborators required to build the app. */
 export interface AppDependencies {
   store: Store;
-  paymentGateway: PaymentGateway;
+  /**
+   * Optional payment gateway. No longer used by checkout — the single-day
+   * event collects UPI/cash off-platform and marks orders paid manually — but
+   * kept for backwards compatibility with existing callers/tests.
+   */
+  paymentGateway?: PaymentGateway;
   /**
    * Notification gateway used to send an order confirmation after a successful
    * checkout. Injectable so tests use a deterministic mock; defaults to
@@ -81,7 +85,7 @@ export interface ApiError {
  * gateway. Each endpoint task registers its routes on the app created here.
  */
 export function createApp(deps: AppDependencies): Express {
-  const { store, paymentGateway } = deps;
+  const { store } = deps;
   const notificationGateway =
     deps.notificationGateway ?? new MockNotificationGateway();
   const rng = deps.rng ?? Math.random;
@@ -128,6 +132,20 @@ export function createApp(deps: AppDependencies): Express {
   // display the full catalogue to users.
   app.get("/api/menu", (_req: Request, res: Response): void => {
     res.status(200).json(store.getFoodItems());
+  });
+
+  // --- GET /api/config ----------------------------------------------------
+  //
+  // Public, non-secret runtime configuration for the client. Values are read
+  // from the environment (e.g. Vercel Project Environment Variables) at request
+  // time, so they can be changed from the dashboard without rebuilding the
+  // client. Currently exposes the merchant UPI identity used to build the
+  // checkout QR / payment intent, with demo defaults when unset.
+  app.get("/api/config", (_req: Request, res: Response): void => {
+    res.status(200).json({
+      merchantVpa: process.env.MERCHANT_VPA ?? "invest-a-bite@upi",
+      merchantName: process.env.MERCHANT_NAME ?? "Invest-A-Bite",
+    });
   });
 
   // --- POST /api/customers ------------------------------------------------
@@ -209,10 +227,14 @@ export function createApp(deps: AppDependencies): Express {
         customerId?: unknown;
         items?: unknown;
         redeemPoints?: unknown;
+        paymentMethod?: unknown;
       };
 
       const items = Array.isArray(body.items) ? (body.items as CartItem[]) : [];
       const stallId = typeof body.stallId === "string" ? body.stallId : "";
+      // Payment method: "cash" is collected at the counter (no gateway); any
+      // other value defaults to the digital UPI gateway flow.
+      const payWithCash = body.paymentMethod === "cash";
       const redeemPoints =
         typeof body.redeemPoints === "number" && body.redeemPoints > 0
           ? Math.floor(body.redeemPoints)
@@ -281,18 +303,11 @@ export function createApp(deps: AppDependencies): Express {
       }
       const total = Math.max(0, subtotal - discount);
 
-      const orderContext: OrderContext = { stallId, customerId, items };
-      const payment = await paymentGateway.initiatePayment(total, orderContext);
-
-      // On failure, create no order and return a failure response (Req 5.3).
-      if (!payment.success) {
-        const errBody: ApiError = {
-          error: payment.failureReason ?? "Payment failed",
-          code: "PAYMENT_FAILED",
-        };
-        res.status(402).json(errBody);
-        return;
-      }
+      // No payment gateway is integrated (this app runs for a single-day
+      // event). Both UPI (paid by the customer via the QR / their UPI app) and
+      // cash are collected off-platform, so every order is created as PENDING
+      // and later marked "received" by staff from the admin dashboard once the
+      // money actually arrives. There is therefore no online failure path here.
 
       // Deduct redeemed reward points from the wallet.
       if (pointsUsed > 0) {
@@ -311,9 +326,10 @@ export function createApp(deps: AppDependencies): Express {
         items,
         total,
         status: "Craving Funded",
-        paid: true,
-        paymentMethod: "UPI",
-        gatewayRef: payment.gatewayRef,
+        // Pending until staff confirm the cash/UPI payment was received; no
+        // gateway means we can't auto-verify payment.
+        paid: false,
+        paymentMethod: payWithCash ? "cash" : "UPI",
         customerId,
         createdAt: new Date().toISOString(),
         spinUsed: false,
@@ -422,6 +438,36 @@ export function createApp(deps: AppDependencies): Express {
       }
 
       order.status = nextStatus(order.status);
+      store.saveOrder(order);
+
+      res.status(200).json(order);
+    }
+  );
+
+  // --- POST /api/orders/:token/mark-paid ----------------------------------
+  //
+  // Marks an order's payment as received (e.g. staff confirming a cash payment
+  // collected at the counter). Idempotent: marking an already-paid order simply
+  // returns it unchanged. Unknown tokens yield a 404.
+  //
+  // SECURITY NOTE: like the /api/admin/* routes, this is unauthenticated for
+  // the festival demo and MUST be placed behind staff authentication in
+  // production.
+  app.post(
+    "/api/orders/:token/mark-paid",
+    (req: Request, res: Response): void => {
+      const { token } = req.params;
+      const order = store.getOrder(token);
+      if (!order) {
+        const errBody: ApiError = {
+          error: "Order not found",
+          code: "ORDER_NOT_FOUND",
+        };
+        res.status(404).json(errBody);
+        return;
+      }
+
+      order.paid = true;
       store.saveOrder(order);
 
       res.status(200).json(order);

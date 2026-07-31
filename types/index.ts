@@ -20,7 +20,7 @@ export type SpinReward =
   | "double FoodCoins"
   | "lucky draw ticket";
 
-export type PaymentMethod = "UPI" | "other";
+export type PaymentMethod = "UPI" | "cash" | "other";
 
 // --- Core marketplace models ----------------------------------------------
 
