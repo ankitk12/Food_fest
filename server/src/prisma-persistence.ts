@@ -199,6 +199,9 @@ interface OrderRow {
   spinReward: string | null;
   pointsUsed: number | null;
   discount: number | null;
+  deliveryType: string | null;
+  deskLocation: string | null;
+  floorNo: string | null;
 }
 
 function orderToRow(o: Order): Prisma.OrderCreateManyInput {
@@ -217,6 +220,9 @@ function orderToRow(o: Order): Prisma.OrderCreateManyInput {
     spinReward: o.spinReward ?? null,
     pointsUsed: o.pointsUsed ?? null,
     discount: o.discount ?? null,
+    deliveryType: o.deliveryType ?? null,
+    deskLocation: o.deskLocation ?? null,
+    floorNo: o.floorNo ?? null,
   };
 }
 
@@ -236,6 +242,11 @@ function rowToOrder(row: OrderRow): Order {
     ...(row.spinReward ? { spinReward: row.spinReward as SpinReward } : {}),
     ...(row.pointsUsed !== null ? { pointsUsed: row.pointsUsed } : {}),
     ...(row.discount !== null ? { discount: row.discount } : {}),
+    ...(row.deliveryType
+      ? { deliveryType: row.deliveryType as Order["deliveryType"] }
+      : {}),
+    ...(row.deskLocation ? { deskLocation: row.deskLocation } : {}),
+    ...(row.floorNo ? { floorNo: row.floorNo } : {}),
   };
 }
 

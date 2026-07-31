@@ -93,6 +93,10 @@ export function CheckoutView(): JSX.Element {
   const [showUpi, setShowUpi] = useState(false);
   // Merchant UPI identity, loaded from the server's runtime config.
   const [merchant, setMerchant] = useState<MerchantConfig>(DEFAULT_MERCHANT);
+  // Delivery: collect at stall (default) or deliver to a desk (needs location).
+  const [deliveryType, setDeliveryType] = useState<"stall" | "desk">("stall");
+  const [deskLocation, setDeskLocation] = useState("");
+  const [floorNo, setFloorNo] = useState("");
 
   useEffect(() => {
     getConfig()
@@ -114,8 +118,13 @@ export function CheckoutView(): JSX.Element {
   const discount = useRewards ? maxDiscount : 0;
   const amountToPay = total - discount;
 
+  // Desk delivery needs a location + floor before the order can be placed.
+  const deliveryValid =
+    deliveryType === "stall" ||
+    (deskLocation.trim() !== "" && floorNo.trim() !== "");
+
   async function handlePay(method: "UPI" | "cash"): Promise<void> {
-    if (!customer) return;
+    if (!customer || !deliveryValid) return;
     const stallId = DEMO_STALL_ID;
     setState({ status: "paying" });
     try {
@@ -125,6 +134,10 @@ export function CheckoutView(): JSX.Element {
         items: toCartItems(cart),
         redeemPoints: useRewards ? pointsToUse : undefined,
         paymentMethod: method,
+        deliveryType,
+        ...(deliveryType === "desk"
+          ? { deskLocation: deskLocation.trim(), floorNo: floorNo.trim() }
+          : {}),
       });
       clearCart();
       setShowUpi(false);
@@ -262,6 +275,60 @@ export function CheckoutView(): JSX.Element {
         Ordering as {customer.name || customer.mobile} ({customer.mobile}).
       </p>
 
+      <fieldset className="checkout-delivery" data-testid="checkout-delivery">
+        <legend>How would you like to receive your order?</legend>
+        <label className="checkout-delivery-option">
+          <input
+            type="radio"
+            name="deliveryType"
+            value="stall"
+            checked={deliveryType === "stall"}
+            onChange={() => setDeliveryType("stall")}
+          />
+          <span>Collect at stall</span>
+        </label>
+        <label className="checkout-delivery-option">
+          <input
+            type="radio"
+            name="deliveryType"
+            value="desk"
+            checked={deliveryType === "desk"}
+            onChange={() => setDeliveryType("desk")}
+          />
+          <span>Delivery at desk</span>
+        </label>
+
+        {deliveryType === "desk" && (
+          <div className="checkout-desk-fields" data-testid="checkout-desk-fields">
+            <label className="checkout-desk-field">
+              <span>Desk location *</span>
+              <input
+                type="text"
+                data-testid="checkout-desk-location"
+                placeholder="e.g. Sales wing, Desk 12"
+                value={deskLocation}
+                onChange={(e) => setDeskLocation(e.target.value)}
+              />
+            </label>
+            <label className="checkout-desk-field">
+              <span>Floor no *</span>
+              <input
+                type="text"
+                data-testid="checkout-floor-no"
+                placeholder="e.g. 3"
+                value={floorNo}
+                onChange={(e) => setFloorNo(e.target.value)}
+              />
+            </label>
+            {!deliveryValid && (
+              <p className="checkout-desk-hint" role="note">
+                Enter a desk location and floor number to continue.
+              </p>
+            )}
+          </div>
+        )}
+      </fieldset>
+
       {state.status === "failed" && (
         <p role="alert" className="checkout-error" data-testid="payment-error">
           {state.message}
@@ -283,7 +350,7 @@ export function CheckoutView(): JSX.Element {
             type="button"
             className="checkout-pay checkout-pay--upi"
             onClick={() => setShowUpi(true)}
-            disabled={state.status === "paying"}
+            disabled={state.status === "paying" || !deliveryValid}
           >
             Pay with UPI
           </button>
@@ -291,7 +358,7 @@ export function CheckoutView(): JSX.Element {
             type="button"
             className="checkout-pay checkout-pay--cash"
             onClick={() => void handlePay("cash")}
-            disabled={state.status === "paying"}
+            disabled={state.status === "paying" || !deliveryValid}
           >
             {state.status === "paying" ? "Processing…" : "Pay with Cash"}
           </button>

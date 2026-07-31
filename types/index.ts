@@ -22,6 +22,13 @@ export type SpinReward =
 
 export type PaymentMethod = "UPI" | "cash" | "other";
 
+/**
+ * How the customer receives their order:
+ *   - "stall" — collect at the stall counter (default)
+ *   - "desk"  — delivered to a desk; requires a desk location + floor number
+ */
+export type DeliveryType = "stall" | "desk";
+
 // --- Core marketplace models ----------------------------------------------
 
 export interface FoodItem {
@@ -81,6 +88,9 @@ export interface Order {
   spinReward?: SpinReward; // the reward drawn for this order's single spin, once used
   pointsUsed?: number; // FoodCoins (reward points) redeemed against this order at checkout
   discount?: number; // INR discount applied from redeemed reward points at checkout
+  deliveryType?: DeliveryType; // how the order is received (defaults to "stall")
+  deskLocation?: string; // desk/table location, when deliveryType is "desk"
+  floorNo?: string; // floor number, when deliveryType is "desk"
 }
 
 /**

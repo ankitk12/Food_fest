@@ -52,6 +52,9 @@ model Order {
   spinReward    String?
   pointsUsed    Int?
   discount      Float?
+  deliveryType  String?
+  deskLocation  String?
+  floorNo       String?
 }
 
 /// Per-item stock/price overrides applied on top of the seeded catalogue.

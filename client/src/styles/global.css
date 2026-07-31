@@ -464,7 +464,7 @@ main.home {
   margin: 0;
   padding: 0 0 0 1.2rem;
   font-size: 0.9rem;
-  color: var(--ia-text-muted);
+  color: #ffffff;
   line-height: 1.7;
 }
 
@@ -820,6 +820,65 @@ main.home {
   border-radius: var(--ia-radius);
   padding: 0.75rem 1rem;
   margin: 0.75rem 0;
+}
+
+/* --- checkout delivery type --- */
+
+.checkout-delivery {
+  border: 1px solid var(--ia-border);
+  border-radius: var(--ia-radius);
+  padding: 0.75rem 1rem 1rem;
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.checkout-delivery legend {
+  font-weight: 600;
+  color: var(--ia-text-muted);
+  padding: 0 0.4rem;
+}
+
+.checkout-delivery-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkout-desk-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.checkout-desk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+  flex: 1 1 160px;
+}
+
+.checkout-desk-field input {
+  font-weight: 400;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--ia-border);
+  border-radius: 8px;
+}
+
+.checkout-desk-hint {
+  flex-basis: 100%;
+  margin: 0;
+  color: #9a6a00;
+  font-size: 0.85rem;
+}
+
+.admin-order-card-delivery {
+  color: var(--ia-text-muted);
+  font-size: 0.9rem;
 }
 
 /* --- UPI payment screen --- */

@@ -70,6 +70,12 @@ export interface CheckoutRequest {
    * is collected at the counter and skips the gateway. Defaults to "UPI".
    */
   paymentMethod?: "UPI" | "cash";
+  /** How the order is received: collect at stall (default) or desk delivery. */
+  deliveryType?: "stall" | "desk";
+  /** Desk/table location — required when `deliveryType` is "desk". */
+  deskLocation?: string;
+  /** Floor number — required when `deliveryType` is "desk". */
+  floorNo?: string;
 }
 
 export interface CheckoutResponse {
@@ -106,6 +112,9 @@ export interface OrderResponse {
   createdAt: string;
   spinUsed: boolean;
   spinReward?: SpinReward;
+  deliveryType?: "stall" | "desk";
+  deskLocation?: string;
+  floorNo?: string;
 }
 
 export interface RedeemResponse extends Wallet {}

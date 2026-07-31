@@ -74,7 +74,6 @@ describe("AdminOrdersView listing", () => {
 
     const row = await screen.findByTestId("admin-order-BB-ABC-1");
     expect(row).toHaveTextContent("BB-ABC-1");
-    expect(row).toHaveTextContent("stall-tandoori");
     expect(row).toHaveTextContent("+919876543210");
     // The customer's registered name is shown alongside the number.
     expect(row).toHaveTextContent("Asha Rao");

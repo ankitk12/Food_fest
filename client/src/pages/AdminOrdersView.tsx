@@ -226,8 +226,15 @@ function AdminOrdersPanel(): JSX.Element {
                   {order.customerId}
                 </div>
 
-                <div className="admin-order-card-stall">
-                  🏪 {order.stallId}
+                <div
+                  className="admin-order-card-delivery"
+                  data-testid={`admin-delivery-${order.token}`}
+                >
+                  {order.deliveryType === "desk"
+                    ? `🛎️ Desk delivery — ${order.deskLocation ?? ""}${
+                        order.floorNo ? `, Floor ${order.floorNo}` : ""
+                      }`
+                    : "🏪 Collect at stall"}
                 </div>
 
                 <div className="admin-order-card-items">

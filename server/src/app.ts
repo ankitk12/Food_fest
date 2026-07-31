@@ -228,6 +228,9 @@ export function createApp(deps: AppDependencies): Express {
         items?: unknown;
         redeemPoints?: unknown;
         paymentMethod?: unknown;
+        deliveryType?: unknown;
+        deskLocation?: unknown;
+        floorNo?: unknown;
       };
 
       const items = Array.isArray(body.items) ? (body.items as CartItem[]) : [];
@@ -235,6 +238,13 @@ export function createApp(deps: AppDependencies): Express {
       // Payment method: "cash" is collected at the counter (no gateway); any
       // other value defaults to the digital UPI gateway flow.
       const payWithCash = body.paymentMethod === "cash";
+      // Delivery type: "desk" delivers to a desk (needs a location + floor);
+      // anything else defaults to collecting at the stall counter.
+      const deliverToDesk = body.deliveryType === "desk";
+      const deskLocation =
+        typeof body.deskLocation === "string" ? body.deskLocation.trim() : "";
+      const floorNo =
+        typeof body.floorNo === "string" ? body.floorNo.trim() : "";
       const redeemPoints =
         typeof body.redeemPoints === "number" && body.redeemPoints > 0
           ? Math.floor(body.redeemPoints)
@@ -256,6 +266,16 @@ export function createApp(deps: AppDependencies): Express {
         const errBody: ApiError = {
           error: "Cannot checkout with an empty cart",
           code: "EMPTY_CART",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+
+      // Desk delivery requires a location and floor number.
+      if (deliverToDesk && (deskLocation === "" || floorNo === "")) {
+        const errBody: ApiError = {
+          error: "Desk delivery requires a desk location and floor number",
+          code: "INVALID_DELIVERY",
         };
         res.status(400).json(errBody);
         return;
@@ -335,6 +355,8 @@ export function createApp(deps: AppDependencies): Express {
         spinUsed: false,
         pointsUsed,
         discount,
+        deliveryType: deliverToDesk ? "desk" : "stall",
+        ...(deliverToDesk ? { deskLocation, floorNo } : {}),
       };
       store.saveOrder(order);
 

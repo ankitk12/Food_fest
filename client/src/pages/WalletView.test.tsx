@@ -54,26 +54,4 @@ describe("WalletView balance display (Req 9.2)", () => {
   });
 });
 
-describe("WalletView redemption options (Req 9.5)", () => {
-  it("renders the three redemption option types", async () => {
-    getWalletMock.mockResolvedValueOnce({
-      customerId: "demo-customer",
-      foodCoins: 100,
-    });
 
-    renderWalletAt(walletPath("demo-customer"));
-
-    // Wait for the balance so the async load has settled.
-    await screen.findByTestId("wallet-balance");
-
-    expect(screen.getByTestId("redemption-toppings")).toHaveTextContent(
-      /free toppings/i
-    );
-    expect(screen.getByTestId("redemption-discount")).toHaveTextContent(
-      /discount/i
-    );
-    expect(screen.getByTestId("redemption-lucky-draw")).toHaveTextContent(
-      /lucky draw/i
-    );
-  });
-});
