@@ -1,0 +1,25 @@
+// Prisma schema for the ByteBites server.
+//
+// The server keeps its canonical state in an in-memory `Store` and persists a
+// single serializable snapshot of its mutable runtime state (orders, wallets,
+// referrals, customers, item stock/price overrides, and admin-created items).
+// That snapshot maps cleanly to one JSON-backed row here, so switching from the
+// JSON file to Postgres does not require a relational rewrite of the domain.
+//
+// Set database_PRISMA_DATABASE_URL to your Prisma Postgres (or any Postgres) connection string.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A single-row document holding the full Store snapshot as JSON.
+model Snapshot {
+  id        String   @id @default("singleton")
+  data      Json
+  updatedAt DateTime @updatedAt
+}
