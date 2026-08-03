@@ -1,10 +1,42 @@
+import type { FoodItem } from "../../../types/index.js";
+
+export interface HeroSectionProps {
+  /** Array of catalogue food items to compute lowest/highest price dynamically */
+  items?: FoodItem[];
+  /** Optional explicit minimum price override */
+  minPrice?: number;
+  /** Optional explicit maximum price override */
+  maxPrice?: number;
+}
+
 /**
  * HeroSection — Invest-A-Bite landing hero.
  *
  * Renders the brand identity area with animated background orbs,
  * "NOW TRADING" badge, title, tagline, price range, and market status.
  */
-export function HeroSection(): JSX.Element {
+export function HeroSection({
+  items,
+  minPrice: propMinPrice,
+  maxPrice: propMaxPrice,
+}: HeroSectionProps = {}): JSX.Element {
+  let min = propMinPrice;
+  let max = propMaxPrice;
+
+  if ((min === undefined || max === undefined) && items && items.length > 0) {
+    const prices = items.map((item) => item.price);
+    if (min === undefined) min = Math.min(...prices);
+    if (max === undefined) max = Math.max(...prices);
+  }
+
+  const displayMin = min ?? 15;
+  const displayMax = max ?? 80;
+
+  const priceText =
+    displayMin === displayMax
+      ? `₹${displayMin}`
+      : `₹${displayMin}–${displayMax}`;
+
   return (
     <section
       className="ia-hero"
@@ -175,7 +207,7 @@ export function HeroSection(): JSX.Element {
               letterSpacing: "0.02em",
             }}
           >
-            ₹15–80
+            {priceText}
           </span>
         </div>
 

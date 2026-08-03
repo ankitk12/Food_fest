@@ -6,17 +6,12 @@ import {
   menuArb,
   nonEmptyCartArb,
   orderSetArb,
-  preferencesArb,
   ratingsArb,
-  referralScenarioArb,
   stallsArb,
   walletArb,
 } from "./generators.js";
 import {
-  FLAVOR_VALUES,
   ORDER_STATUS_SEQUENCE,
-  PORTION_VALUES,
-  SPICE_VALUES,
 } from "./index.js";
 
 describe("shared generators", () => {
@@ -27,9 +22,6 @@ describe("shared generators", () => {
         expect(item.rating).toBeLessThanOrEqual(5);
         expect(item.availableQuantity).toBeGreaterThanOrEqual(0);
         expect(item.price).toBeGreaterThan(0);
-        expect(SPICE_VALUES).toContain(item.spice);
-        expect(FLAVOR_VALUES).toContain(item.flavor);
-        expect(PORTION_VALUES).toContain(item.portion);
       })
     );
   });
@@ -65,15 +57,7 @@ describe("shared generators", () => {
     );
   });
 
-  it("preferences use valid enum values", () => {
-    fc.assert(
-      fc.property(preferencesArb, (prefs) => {
-        expect(PORTION_VALUES).toContain(prefs.hunger);
-        expect(SPICE_VALUES).toContain(prefs.spice);
-        expect(FLAVOR_VALUES).toContain(prefs.taste);
-      })
-    );
-  });
+
 
   it("order sets: total equals sum of line totals, valid status", () => {
     fc.assert(
@@ -122,14 +106,7 @@ describe("shared generators", () => {
     );
   });
 
-  it("referral scenario yields a referrer and referred ids", () => {
-    fc.assert(
-      fc.property(referralScenarioArb, (scenario) => {
-        expect(scenario.referrer.length).toBeGreaterThan(0);
-        expect(Array.isArray(scenario.referredIds)).toBe(true);
-      })
-    );
-  });
+
 
   it("ratings are within 0..5", () => {
     fc.assert(

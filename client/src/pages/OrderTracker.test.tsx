@@ -36,7 +36,6 @@ function order(status: OrderResponse["status"]): OrderResponse {
     paymentMethod: "UPI",
     customerId: "demo-customer",
     createdAt: new Date().toISOString(),
-    spinUsed: false,
   };
 }
 

@@ -35,7 +35,7 @@ export function SummaryView(): JSX.Element {
 
 function SummaryPanel(): JSX.Element {
   const fetchSummary = useCallback(() => getAdminSummary(), []);
-  const { data, error, loading } = usePolling<AdminSummary>(fetchSummary);
+  const { data, error, loading } = usePolling<AdminSummary>(fetchSummary, { intervalMs: 0 });
 
   return (
     <main className="admin">

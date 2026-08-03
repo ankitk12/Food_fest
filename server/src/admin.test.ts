@@ -12,7 +12,6 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { Store } from "./store.js";
-import { MockGateway } from "./gateways/mock-gateway.js";
 import type { FoodItem, Order, Stall } from "../../types/index.js";
 
 const STALL_A: Stall = { id: "stall-a", name: "A", qrSlug: "a" };
@@ -27,9 +26,6 @@ const ITEM_A: FoodItem = {
   availableQuantity: 10,
   price: 180,
   stallId: "stall-a",
-  spice: "medium",
-  flavor: "savory",
-  portion: "regular",
 };
 
 function makeOrder(token: string, stallId: string, createdAt: string): Order {
@@ -43,13 +39,12 @@ function makeOrder(token: string, stallId: string, createdAt: string): Order {
     paymentMethod: "UPI",
     customerId: "9876543210",
     createdAt,
-    spinUsed: false,
   };
 }
 
 function buildApp() {
   const store = new Store({ stalls: [STALL_A, STALL_B], foodItems: [] });
-  const app = createApp({ store, paymentGateway: new MockGateway() });
+  const app = createApp({ store });
   return { app, store };
 }
 
@@ -141,7 +136,7 @@ describe("GET /api/admin/orders/:token", () => {
 describe("PATCH /api/admin/items/:itemId/price", () => {
   function buildAppWithItem() {
     const store = new Store({ stalls: [STALL_A], foodItems: [ITEM_A] });
-    const app = createApp({ store, paymentGateway: new MockGateway() });
+    const app = createApp({ store });
     return { app, store };
   }
 

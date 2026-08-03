@@ -14,12 +14,9 @@ export const ROUTES = {
   checkout: "/checkout",
   order: "/orders/:token",
   metrics: "/metrics",
-  aiChef: "/ai-chef",
   wallet: "/wallet/:customerId",
-  referral: "/referral/:customerId",
   trending: "/trending",
   investor: "/investor",
-  spin: "/spin",
   profile: "/profile",
   orderHistory: "/order-history",
   admin: "/admin",
@@ -40,9 +37,4 @@ export function orderPath(token: string): string {
 /** Build the wallet path for a specific customer. */
 export function walletPath(customerId: string): string {
   return `/wallet/${encodeURIComponent(customerId)}`;
-}
-
-/** Build the referral path for a specific customer. */
-export function referralPath(customerId: string): string {
-  return `/referral/${encodeURIComponent(customerId)}`;
 }

@@ -30,6 +30,7 @@ export function OrderTracker(): JSX.Element {
 
   const { data, error, loading } = usePolling<OrderResponse>(fetchOrder, {
     enabled: token !== "",
+    intervalMs: 15000,
   });
 
   const currentIndex = data

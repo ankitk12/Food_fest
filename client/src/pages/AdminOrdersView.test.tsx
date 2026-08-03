@@ -38,7 +38,6 @@ const order: OrderResponse = {
   customerId: "+919876543210",
   customerName: "Asha Rao",
   createdAt: "2024-01-01T10:00:00.000Z",
-  spinUsed: false,
 };
 
 function renderAdmin(): void {

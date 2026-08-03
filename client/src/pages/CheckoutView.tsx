@@ -7,8 +7,9 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ApiClientError, checkout, getConfig, getWallet } from "../api/client.js";
+import { ApiClientError, checkout, getConfig, getCoupons } from "../api/client.js";
 import type { CheckoutResponse } from "../api/client.js";
+import type { Coupon } from "../../../types/index.js";
 import { useCart } from "../cart/CartContext.js";
 import { useCustomer } from "../customer/CustomerContext.js";
 import { toCartItems } from "../cart/cart.js";
@@ -86,8 +87,13 @@ export function CheckoutView(): JSX.Element {
   const { customer } = useCustomer();
   const navigate = useNavigate();
   const [state, setState] = useState<CheckoutState>({ status: "idle" });
-  const [rewardBalance, setRewardBalance] = useState(0);
-  const [useRewards, setUseRewards] = useState(false);
+  // Available coupons fetched from the server on mount.
+  const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
+  // The coupon code the customer has typed or selected.
+  const [couponInput, setCouponInput] = useState("");
+  // The coupon that has been validated and applied.
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
   // When true, the UPI payment screen (QR + app buttons) is shown before the
   // customer confirms they've paid.
   const [showUpi, setShowUpi] = useState(false);
@@ -104,19 +110,55 @@ export function CheckoutView(): JSX.Element {
       .catch(() => setMerchant(DEFAULT_MERCHANT));
   }, []);
 
-  // Fetch the user's reward points balance
+  // Fetch all active coupons so we can display them to the customer.
   useEffect(() => {
-    if (!customer) return;
-    getWallet(customer.mobile)
-      .then((w) => setRewardBalance(w.foodCoins))
-      .catch(() => setRewardBalance(0));
-  }, [customer]);
+    getCoupons()
+      .then(setAvailableCoupons)
+      .catch(() => setAvailableCoupons([]));
+  }, []);
 
-  // Calculate discount: use all available points, capped at order total
-  const maxDiscount = Math.min(rewardBalance * 0.50, total); // 2 points = ₹1
-  const pointsToUse = Math.ceil(maxDiscount * 2);
-  const discount = useRewards ? maxDiscount : 0;
-  const amountToPay = total - discount;
+  // Calculate discount from applied coupon.
+  const couponDiscount = appliedCoupon
+    ? Math.round((total * appliedCoupon.discountPercent) / 100 * 100) / 100
+    : 0;
+  const amountToPay = Math.max(0, total - couponDiscount);
+
+  // Try to apply the typed coupon code.
+  function handleApplyCoupon(): void {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    const coupon = availableCoupons.find((c) => c.code === code && c.active);
+    if (!coupon) {
+      setCouponError(`"${code}" is not a valid coupon code.`);
+      setAppliedCoupon(null);
+      return;
+    }
+    if (total < coupon.minOrderValue) {
+      setCouponError(`Minimum order value of ${formatINR(coupon.minOrderValue)} required for ${code}.`);
+      setAppliedCoupon(null);
+      return;
+    }
+    setAppliedCoupon(coupon);
+    setCouponError(null);
+  }
+
+  // Quick-apply a coupon by clicking on a coupon card.
+  function handleSelectCoupon(coupon: Coupon): void {
+    setCouponInput(coupon.code);
+    if (total < coupon.minOrderValue) {
+      setCouponError(`Minimum order value of ${formatINR(coupon.minOrderValue)} required for ${coupon.code}.`);
+      setAppliedCoupon(null);
+      return;
+    }
+    setAppliedCoupon(coupon);
+    setCouponError(null);
+  }
+
+  function handleRemoveCoupon(): void {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError(null);
+  }
 
   // Desk delivery needs a location + floor before the order can be placed.
   const deliveryValid =
@@ -132,12 +174,12 @@ export function CheckoutView(): JSX.Element {
         stallId,
         customerId: customer.mobile,
         items: toCartItems(cart),
-        redeemPoints: useRewards ? pointsToUse : undefined,
         paymentMethod: method,
         deliveryType,
         ...(deliveryType === "desk"
           ? { deskLocation: deskLocation.trim(), floorNo: floorNo.trim() }
           : {}),
+        ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
       });
       clearCart();
       setShowUpi(false);
@@ -246,24 +288,76 @@ export function CheckoutView(): JSX.Element {
           Subtotal: <strong>{formatINR(total)}</strong>
         </p>
 
-        {rewardBalance > 0 && (
-          <div className="checkout-rewards" data-testid="checkout-rewards">
-            <label className="checkout-rewards-toggle">
-              <input
-                type="checkbox"
-                checked={useRewards}
-                onChange={(e) => setUseRewards(e.target.checked)}
-              />
-              <span>
-                Use reward points ({rewardBalance} pts = {formatINR(rewardBalance * 0.50)})
-              </span>
-            </label>
-            {useRewards && (
-              <p className="checkout-discount">
-                Discount: <strong>−{formatINR(discount)}</strong> ({pointsToUse} points)
-              </p>
-            )}
+        {/* --- Available Coupons --- */}
+        {availableCoupons.length > 0 && (
+          <div className="checkout-coupons" data-testid="checkout-coupons">
+            <p className="checkout-coupons-label">Available coupons:</p>
+            <div className="checkout-coupon-cards">
+              {availableCoupons.map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  className={`checkout-coupon-card${appliedCoupon?.code === c.code ? " checkout-coupon-card--applied" : ""}`}
+                  onClick={() => handleSelectCoupon(c)}
+                  data-testid={`coupon-card-${c.code}`}
+                >
+                  <span className="checkout-coupon-badge">{c.discountPercent}%<br/>OFF</span>
+                  <span className="checkout-coupon-body">
+                    <span className="checkout-coupon-code">{c.code}</span>
+                    <span className="checkout-coupon-desc">
+                      Min order {formatINR(c.minOrderValue)}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
+        )}
+
+        {/* --- Coupon Input --- */}
+        <div className="checkout-coupon-input-row">
+          <input
+            type="text"
+            className="checkout-coupon-input"
+            data-testid="checkout-coupon-input"
+            placeholder="Enter coupon code"
+            value={couponInput}
+            onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleApplyCoupon(); }}
+          />
+          {appliedCoupon ? (
+            <button
+              type="button"
+              className="checkout-coupon-remove"
+              data-testid="checkout-coupon-remove"
+              onClick={handleRemoveCoupon}
+            >
+              Remove
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="checkout-coupon-apply"
+              data-testid="checkout-coupon-apply"
+              onClick={handleApplyCoupon}
+              disabled={!couponInput.trim()}
+            >
+              Apply
+            </button>
+          )}
+        </div>
+
+        {couponError && (
+          <p className="checkout-coupon-error" role="alert" data-testid="coupon-error">
+            {couponError}
+          </p>
+        )}
+
+        {appliedCoupon && (
+          <p className="checkout-discount" data-testid="coupon-applied">
+            🎉 <strong>{appliedCoupon.code}</strong> ({appliedCoupon.discountPercent}% off):{" "}
+            −{formatINR(couponDiscount)}
+          </p>
         )}
 
         <p className="checkout-final-amount" data-testid="checkout-amount">

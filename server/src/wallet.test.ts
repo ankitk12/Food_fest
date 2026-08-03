@@ -16,7 +16,6 @@ import fc from "fast-check";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { Store } from "./store.js";
-import { MockGateway } from "./gateways/mock-gateway.js";
 import { walletBalanceArb } from "../../types/generators.js";
 
 const safeIdArb: fc.Arbitrary<string> = fc
@@ -29,7 +28,7 @@ const safeIdArb: fc.Arbitrary<string> = fc
 function buildAppWithWallet(customerId: string, balance: number) {
   const store = new Store({ stalls: [], foodItems: [] });
   store.saveWallet({ customerId, foodCoins: balance });
-  const app = createApp({ store, paymentGateway: new MockGateway() });
+  const app = createApp({ store });
   return { app, store };
 }
 
@@ -43,7 +42,7 @@ describe("GET /api/wallet/:customerId", () => {
 
   it("auto-creates a zero-balance wallet for an unknown customer", async () => {
     const store = new Store({ stalls: [], foodItems: [] });
-    const app = createApp({ store, paymentGateway: new MockGateway() });
+    const app = createApp({ store });
     const res = await request(app).get("/api/wallet/new-cust");
     expect(res.status).toBe(200);
     expect(res.body.foodCoins).toBe(0);

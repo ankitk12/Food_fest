@@ -62,7 +62,7 @@ export function OrderHistoryView(): JSX.Element {
 
   const { data: orders, error, loading } = usePolling<OrderResponse[]>(
     fetchOrders,
-    { enabled: !!customer }
+    { enabled: !!customer, intervalMs: 60000 }
   );
 
   if (!customer) {
@@ -149,17 +149,11 @@ export function OrderHistoryView(): JSX.Element {
                   </div>
 
                   <div className="order-card-rewards">
-                    {coins > 0 && (
+                    {coins > 0 ? (
                       <span className="order-card-coins" title="Reward points earned">
                         🪙 +{coins} points
                       </span>
-                    )}
-                    {order.spinReward && (
-                      <span className="order-card-spin" title="Spin reward">
-                        🎰 {order.spinReward}
-                      </span>
-                    )}
-                    {!coins && !order.spinReward && (
+                    ) : (
                       <span className="order-card-no-reward">—</span>
                     )}
                   </div>

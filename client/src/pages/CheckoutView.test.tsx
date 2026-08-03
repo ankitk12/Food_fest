@@ -39,9 +39,6 @@ const sampleItem: FoodItem = {
   availableQuantity: 40,
   price: 180,
   stallId: "stall-tandoori",
-  spice: "medium",
-  flavor: "savory",
-  portion: "regular",
 };
 
 /** Seeds the cart with one sample item, then renders CheckoutView. */
@@ -98,7 +95,6 @@ describe("CheckoutView token display (Req 5.5)", () => {
       token: "BB-TOKEN-123",
       status: "Craving Funded",
       coinsEarned: 18,
-      spinAvailable: true,
       total: 180,
       notified: true,
     });
@@ -123,7 +119,6 @@ describe("CheckoutView customer identity", () => {
       token: "BB-TOKEN-9",
       status: "Craving Funded",
       coinsEarned: 5,
-      spinAvailable: true,
       total: 180,
       notified: false,
     });

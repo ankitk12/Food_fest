@@ -23,9 +23,6 @@ function sampleItem(id: string, stallId: string): FoodItem {
     availableQuantity: 10,
     price: 50,
     stallId,
-    spice: "mild",
-    flavor: "sweet",
-    portion: "light",
   };
 }
 
@@ -86,7 +83,7 @@ describe("Store deterministic reset", () => {
     const seedStallsSnapshot = store.getStalls();
     const seedItems = store.getFoodItems();
 
-    // Mutate: add an order, credit a wallet, add a referral, change stock.
+    // Mutate: add an order, credit a wallet, change stock.
     store.saveOrder({
       token: "T-1",
       stallId: seedStallsSnapshot[0].id,
@@ -97,14 +94,8 @@ describe("Store deterministic reset", () => {
       paymentMethod: "UPI",
       customerId: "cust-1",
       createdAt: new Date().toISOString(),
-      spinUsed: false,
     });
     store.saveWallet({ customerId: "cust-1", foodCoins: 99 });
-    store.saveReferral({
-      customerId: "cust-1",
-      link: "https://bytebites.demo/r/cust-1",
-      creditedReferredIds: ["cust-2"],
-    });
     const someItem = seedItems[0];
     store.setAvailableQuantity(someItem.id, 0);
 
@@ -114,7 +105,6 @@ describe("Store deterministic reset", () => {
 
     // Runtime state cleared.
     expect(store.getOrders().length).toBe(0);
-    expect(store.getReferrals().length).toBe(0);
     expect(store.getWallet("cust-1").foodCoins).toBe(0);
 
     // Seed collections restored to their original snapshot.

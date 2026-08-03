@@ -8,17 +8,7 @@
 
 // --- Enumerated string unions ---------------------------------------------
 
-export type Spice = "mild" | "medium" | "hot";
-export type Flavor = "sweet" | "savory";
-export type Portion = "light" | "regular" | "hearty"; // maps to hunger level
-
 export type OrderStatus = "Craving Funded" | "Flavor Processing" | "Taste Ready for Pickup" | "Happiness Disbursed";
-
-export type SpinReward =
-  | "5% discount"
-  | "free drink"
-  | "double FoodCoins"
-  | "lucky draw ticket";
 
 export type PaymentMethod = "UPI" | "cash" | "other";
 
@@ -40,9 +30,6 @@ export interface FoodItem {
   availableQuantity: number;
   price: number; // INR, > 0
   stallId: string;
-  spice: Spice;
-  flavor: Flavor;
-  portion: Portion; // maps to hunger level
 }
 
 export interface CartItem {
@@ -84,10 +71,9 @@ export interface Order {
   gatewayRef?: string;
   customerId: string;
   createdAt: string; // ISO timestamp
-  spinUsed: boolean;
-  spinReward?: SpinReward; // the reward drawn for this order's single spin, once used
   pointsUsed?: number; // FoodCoins (reward points) redeemed against this order at checkout
-  discount?: number; // INR discount applied from redeemed reward points at checkout
+  discount?: number; // INR discount applied from redeemed reward points or coupon at checkout
+  couponCode?: string; // Coupon code applied at checkout (e.g. "SAVE10")
   deliveryType?: DeliveryType; // how the order is received (defaults to "stall")
   deskLocation?: string; // desk/table location, when deliveryType is "desk"
   floorNo?: string; // floor number, when deliveryType is "desk"
@@ -106,23 +92,13 @@ export interface Wallet {
   foodCoins: number; // >= 0, integer
 }
 
-export interface Referral {
-  customerId: string;
-  link: string; // unique
-  creditedReferredIds: string[]; // referred customers already rewarded (once each)
-}
+// --- Coupon models ---------------------------------------------------------
 
-// --- AI Chef models --------------------------------------------------------
-
-export interface Preferences {
-  hunger: Portion;
-  spice: Spice;
-  taste: Flavor;
-}
-
-export interface RecommendedItem {
-  item: FoodItem;
-  confidence: number; // 0..100
+export interface Coupon {
+  code: string; // e.g. "SAVE10" (unique)
+  discountPercent: number; // e.g. 10 for 10%
+  minOrderValue: number; // e.g. 200 INR
+  active: boolean;
 }
 
 // --- Trending & metrics models --------------------------------------------
@@ -141,62 +117,6 @@ export interface Metrics {
   customerSatisfactionScore: number; // 0..5
 }
 
-// --- Payment gateway models ------------------------------------------------
-
-export interface PaymentResult {
-  success: boolean;
-  gatewayRef?: string; // Paytm transaction reference when successful
-  failureReason?: string;
-}
-
-export interface OrderContext {
-  stallId: string;
-  customerId: string;
-  items: CartItem[];
-}
-
-export interface PaymentGateway {
-  initiatePayment(
-    amountInRupees: number,
-    orderContext: OrderContext
-  ): Promise<PaymentResult>;
-}
-
-// --- Notification gateway models -------------------------------------------
-
-/** Parameters for an order-confirmation notification (e.g. WhatsApp). */
-export interface OrderConfirmationParams {
-  /** The customer's mobile number the confirmation is sent to. */
-  toMobile: string;
-  /** The order's unique pickup token. */
-  token: string;
-  /** The order total in INR. */
-  total: number;
-  /** The ordered line items. */
-  items: CartItem[];
-  /** The originating stall's display name, when available. */
-  stallName?: string;
-}
-
-/** The outcome of attempting to send a notification. */
-export interface NotificationResult {
-  sent: boolean;
-  /** A provider reference for a sent message (e.g. WhatsApp message id). */
-  ref?: string;
-  /** A human-readable reason when the send did not succeed. */
-  error?: string;
-}
-
-/**
- * A pluggable notification gateway, mirroring the `PaymentGateway` pattern.
- * Implementations deliver an order-confirmation message to the customer.
- */
-export interface NotificationGateway {
-  sendOrderConfirmation(
-    params: OrderConfirmationParams
-  ): Promise<NotificationResult>;
-}
-
 // --- Convenient value tuples for enumerations ------------------------------
 
 export const ORDER_STATUS_SEQUENCE: readonly OrderStatus[] = [
@@ -204,19 +124,4 @@ export const ORDER_STATUS_SEQUENCE: readonly OrderStatus[] = [
   "Flavor Processing",
   "Taste Ready for Pickup",
   "Happiness Disbursed",
-] as const;
-
-export const SPIN_REWARDS: readonly SpinReward[] = [
-  "5% discount",
-  "free drink",
-  "double FoodCoins",
-  "lucky draw ticket",
-] as const;
-
-export const SPICE_VALUES: readonly Spice[] = ["mild", "medium", "hot"] as const;
-export const FLAVOR_VALUES: readonly Flavor[] = ["sweet", "savory"] as const;
-export const PORTION_VALUES: readonly Portion[] = [
-  "light",
-  "regular",
-  "hearty",
 ] as const;

@@ -13,19 +13,13 @@
 
 import type {
   CartItem,
+  Coupon,
   Customer,
   FoodItem,
-  Flavor,
   Metrics,
-  Portion,
-  Preferences,
-  RecommendedItem,
-  Referral,
-  Spice,
   TrendingEntry,
   Wallet,
   OrderStatus,
-  SpinReward,
 } from "../../../types/index.js";
 
 // --- Base URL configuration ------------------------------------------------
@@ -35,6 +29,11 @@ let baseUrl = "/api";
 /** Override the API base URL (e.g. in tests or non-same-origin deployments). */
 export function configureApiBaseUrl(url: string): void {
   baseUrl = url.replace(/\/$/, "");
+}
+
+/** Reset base URL to default "/api". Useful between test cases. */
+export function resetApiBaseUrl(): void {
+  baseUrl = "/api";
 }
 
 /** The currently configured API base URL. */
@@ -76,13 +75,14 @@ export interface CheckoutRequest {
   deskLocation?: string;
   /** Floor number — required when `deliveryType` is "desk". */
   floorNo?: string;
+  /** Coupon code to apply for a percentage discount (e.g. "SAVE10"). */
+  couponCode?: string;
 }
 
 export interface CheckoutResponse {
   token: string;
   status: OrderStatus;
   coinsEarned: number;
-  spinAvailable: boolean;
   total: number;
   /** Discount applied from redeemed reward points (in rupees). */
   discount: number;
@@ -110,39 +110,12 @@ export interface OrderResponse {
   /** The customer's registered name (empty string when unknown). */
   customerName?: string;
   createdAt: string;
-  spinUsed: boolean;
-  spinReward?: SpinReward;
   deliveryType?: "stall" | "desk";
   deskLocation?: string;
   floorNo?: string;
 }
 
 export interface RedeemResponse extends Wallet {}
-
-export interface ReferralClaimRequest {
-  referrerId: string;
-  referredId: string;
-}
-
-export interface ReferralClaimResponse {
-  referrerId: string;
-  referredId: string;
-  credited: number;
-  alreadyCredited: boolean;
-  balance: number;
-}
-
-export interface RecommendResponse {
-  items: RecommendedItem[];
-  exactMatch: boolean;
-}
-
-export interface SpinResponse {
-  token: string;
-  reward: SpinReward;
-  spinUsed: boolean;
-  balance: number;
-}
 
 // --- Core request helper ---------------------------------------------------
 
@@ -251,9 +224,6 @@ export interface CreateItemRequest {
   description?: string;
   imageUrl?: string;
   rating?: number;
-  spice?: Spice;
-  flavor?: Flavor;
-  portion?: Portion;
 }
 
 /** POST /api/admin/items — create a new food item; returns the created item. */
@@ -371,13 +341,6 @@ export function getTrending(): Promise<TrendingEntry[]> {
   return request<TrendingEntry[]>("/trending");
 }
 
-/** POST /api/ai-chef/recommend — recommendations from preference inputs. */
-export function recommend(
-  prefs: Preferences & { stallId?: string }
-): Promise<RecommendResponse> {
-  return postJson<RecommendResponse>("/ai-chef/recommend", prefs);
-}
-
 /** GET /api/wallet/:customerId — FoodCoins balance. */
 export function getWallet(customerId: string): Promise<Wallet> {
   return request<Wallet>(`/wallet/${encodeURIComponent(customerId)}`);
@@ -394,22 +357,28 @@ export function redeem(
   );
 }
 
-/** GET /api/referral/:customerId — referral link for the customer. */
-export function getReferral(customerId: string): Promise<Referral> {
-  return request<Referral>(`/referral/${encodeURIComponent(customerId)}`);
+// --- Coupons ---------------------------------------------------------------
+
+/** GET /api/coupons — all active coupon codes (public). */
+export function getCoupons(): Promise<Coupon[]> {
+  return request<Coupon[]>("/coupons");
 }
 
-/** POST /api/referral/claim — credit the referrer on a referred first order. */
-export function claimReferral(
-  req: ReferralClaimRequest
-): Promise<ReferralClaimResponse> {
-  return postJson<ReferralClaimResponse>("/referral/claim", req);
+/** GET /api/admin/coupons — all coupons for admin. */
+export function getAdminCoupons(): Promise<Coupon[]> {
+  return request<Coupon[]>("/admin/coupons");
 }
 
-/** POST /api/orders/:token/spin — perform the single spin for a paid order. */
-export function spin(token: string): Promise<SpinResponse> {
-  return postJson<SpinResponse>(
-    `/orders/${encodeURIComponent(token)}/spin`,
-    {}
-  );
+/** POST /api/admin/coupons — create or update a coupon. */
+export function createAdminCoupon(
+  coupon: Omit<Coupon, "active"> & { active?: boolean }
+): Promise<Coupon> {
+  return postJson<Coupon>("/admin/coupons", coupon);
+}
+
+/** DELETE /api/admin/coupons/:code — delete a coupon. */
+export function deleteAdminCoupon(code: string): Promise<{ deleted: string }> {
+  return request<{ deleted: string }>(`/admin/coupons/${encodeURIComponent(code)}`, {
+    method: "DELETE",
+  });
 }

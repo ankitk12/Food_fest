@@ -15,7 +15,7 @@ import { usePolling } from "../hooks/usePolling.js";
 
 export function TrendingBoard(): JSX.Element {
   const fetchTrending = useCallback(() => getTrending(), []);
-  const { data, error, loading } = usePolling<TrendingEntry[]>(fetchTrending);
+  const { data, error, loading } = usePolling<TrendingEntry[]>(fetchTrending, { intervalMs: 0 });
 
   return (
     <main className="trending-board">

@@ -18,14 +18,13 @@ import fc from "fast-check";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { Store } from "./store.js";
-import { MockGateway } from "./gateways/mock-gateway.js";
 import { foodItemArb, nameArb } from "../../types/generators.js";
 import type { FoodItem, Stall } from "../../types/index.js";
 
 /** Build a test app around a store seeded with the given stalls and items. */
 function buildApp(stalls: Stall[], foodItems: FoodItem[]) {
   const store = new Store({ stalls, foodItems });
-  return createApp({ store, paymentGateway: new MockGateway() });
+  return createApp({ store });
 }
 
 /**
@@ -125,7 +124,7 @@ describe("GET /api/stalls/:stallId/menu — unknown stall error view", () => {
       stalls: [{ id: "stall-known", name: "Known Stall", qrSlug: "known" }],
       foodItems: [],
     });
-    const app = createApp({ store, paymentGateway: new MockGateway() });
+    const app = createApp({ store });
 
     const res = await request(app).get(
       "/api/stalls/stall-does-not-exist/menu"

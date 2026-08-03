@@ -35,11 +35,8 @@ import { CheckoutView } from "./pages/CheckoutView.js";
 import { OrderTracker } from "./pages/OrderTracker.js";
 import { WalletView } from "./pages/WalletView.js";
 import { MetricsDashboard } from "./pages/MetricsDashboard.js";
-import { AIChefView } from "./pages/AIChefView.js";
 import { TrendingBoard } from "./pages/TrendingBoard.js";
-import { ReferralView } from "./pages/ReferralView.js";
 import { InvestorSection } from "./pages/InvestorSection.js";
-import { SpinWheel } from "./pages/SpinWheel.js";
 import { ProfileView } from "./pages/ProfileView.js";
 import { AdminOrdersView } from "./pages/AdminOrdersView.js";
 import { OrderHistoryView } from "./pages/OrderHistoryView.js";
@@ -60,12 +57,9 @@ export function App(): JSX.Element {
           <Route path={ROUTES.checkout} element={<CheckoutView />} />
           <Route path={ROUTES.order} element={<OrderTracker />} />
           <Route path={ROUTES.metrics} element={<MetricsDashboard />} />
-          <Route path={ROUTES.aiChef} element={<AIChefView />} />
           <Route path={ROUTES.wallet} element={<WalletView />} />
-          <Route path={ROUTES.referral} element={<ReferralView />} />
           <Route path={ROUTES.trending} element={<TrendingBoard />} />
           <Route path={ROUTES.investor} element={<InvestorSection />} />
-          <Route path={ROUTES.spin} element={<SpinWheel />} />
           <Route path={ROUTES.profile} element={<ProfileView />} />
           <Route path={ROUTES.orderHistory} element={<OrderHistoryView />} />
           <Route path={ROUTES.admin} element={<AdminOrdersView />} />

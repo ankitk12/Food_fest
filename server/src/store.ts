@@ -23,10 +23,13 @@
  */
 
 import type {
+  CartItem,
+  Coupon,
   Customer,
   FoodItem,
+  Metrics,
   Order,
-  Referral,
+  OrderStatus,
   Stall,
   Wallet,
 } from "../../types/index.js";
@@ -49,6 +52,13 @@ export function seedStalls(): Stall[] {
     { id: "stall-tandoori", name: "Tandoori Tech", qrSlug: "tandoori-tech" },
     { id: "stall-wok", name: "Wok & Roll", qrSlug: "wok-and-roll" },
     { id: "stall-sweet", name: "Sweet Bytes", qrSlug: "sweet-bytes" },
+  ];
+}
+
+/** Build a fresh copy of default seed coupons. */
+export function seedCoupons(): Coupon[] {
+  return [
+    { code: "SAVE10", discountPercent: 10, minOrderValue: 200, active: true },
   ];
 }
 
@@ -129,8 +139,8 @@ export class Store {
   private foodItems: Map<string, FoodItem> = new Map();
   private orders: Map<string, Order> = new Map();
   private wallets: Map<string, Wallet> = new Map();
-  private referrals: Map<string, Referral> = new Map();
   private customers: Map<string, Customer> = new Map();
+  private coupons: Map<string, Coupon> = new Map();
 
   /**
    * Ids of food items created at runtime (not part of the seed catalogue), so
@@ -195,11 +205,13 @@ export class Store {
       for (const wallet of snapshot.wallets) {
         this.wallets.set(wallet.customerId, wallet);
       }
-      for (const referral of snapshot.referrals) {
-        this.referrals.set(referral.customerId, referral);
-      }
       for (const customer of snapshot.customers) {
         this.customers.set(customer.mobile, customer);
+      }
+      // Restore persisted coupons (overwriting the seed defaults so admin
+      // additions / deletions survive a restart).
+      for (const coupon of snapshot.coupons ?? []) {
+        this.coupons.set(coupon.code, coupon);
       }
       for (const [itemId, quantity] of Object.entries(
         snapshot.itemQuantities
@@ -225,8 +237,8 @@ export class Store {
     const snapshot: StoreSnapshot = {
       orders: this.getOrders(),
       wallets: Array.from(this.wallets.values()).map((w) => deepClone(w)),
-      referrals: this.getReferrals(),
       customers: this.getCustomers(),
+      coupons: Array.from(this.coupons.values()).map((c) => deepClone(c)),
       itemQuantities: Object.fromEntries(
         Array.from(this.foodItems.values()).map((i) => [
           i.id,
@@ -247,7 +259,7 @@ export class Store {
 
   /**
    * Restore the deterministic seed state. Clears all runtime state (orders,
-   * wallets, referrals, and any mutations to stalls/items) and repopulates
+   * wallets, and any mutations to stalls/items) and repopulates
    * stalls and food items from the seed. When constructed without an override
    * the default demo seed factories are used; when constructed with a custom
    * `StoreSeed`, that snapshot is restored instead. Safe to call between demo
@@ -258,19 +270,23 @@ export class Store {
     this.foodItems.clear();
     this.orders.clear();
     this.wallets.clear();
-    this.referrals.clear();
     this.customers.clear();
+    this.coupons.clear();
     this.customItemIds.clear();
     this.deletedItemIds.clear();
 
     const stalls = this.seed?.stalls ?? seedStalls();
     const foodItems = this.seed?.foodItems ?? seedFoodItems();
+    const coupons = seedCoupons();
 
     for (const stall of stalls) {
       this.stalls.set(stall.id, deepClone(stall));
     }
     for (const item of foodItems) {
       this.foodItems.set(item.id, deepClone(item));
+    }
+    for (const coupon of coupons) {
+      this.coupons.set(coupon.code, deepClone(coupon));
     }
   }
 
@@ -468,25 +484,6 @@ export class Store {
     this.persist();
   }
 
-  // --- Referrals -----------------------------------------------------------
-
-  /** The referral record for a customer, or undefined when none exists yet. */
-  getReferral(customerId: string): Referral | undefined {
-    const referral = this.referrals.get(customerId);
-    return referral ? deepClone(referral) : undefined;
-  }
-
-  /** All referral records (defensive copies). */
-  getReferrals(): Referral[] {
-    return Array.from(this.referrals.values()).map((r) => deepClone(r));
-  }
-
-  /** Insert or replace a referral record keyed by its customerId. */
-  saveReferral(referral: Referral): void {
-    this.referrals.set(referral.customerId, deepClone(referral));
-    this.persist();
-  }
-
   // --- Customers -----------------------------------------------------------
 
   /**
@@ -507,6 +504,31 @@ export class Store {
   /** Insert or replace a customer keyed by its normalized mobile number. */
   saveCustomer(customer: Customer): void {
     this.customers.set(customer.mobile, deepClone(customer));
+    this.persist();
+  }
+
+  // --- Coupons --------------------------------------------------------------
+
+  /** All coupons (defensive copies). */
+  getCoupons(): Coupon[] {
+    return Array.from(this.coupons.values()).map((c) => deepClone(c));
+  }
+
+  /** A single coupon by code (case-insensitive), or undefined when unknown. */
+  getCoupon(code: string): Coupon | undefined {
+    const coupon = this.coupons.get(code.toUpperCase());
+    return coupon ? deepClone(coupon) : undefined;
+  }
+
+  /** Insert or replace a coupon. Code is normalized to upper-case. */
+  saveCoupon(coupon: Coupon): void {
+    this.coupons.set(coupon.code.toUpperCase(), deepClone({ ...coupon, code: coupon.code.toUpperCase() }));
+    this.persist();
+  }
+
+  /** Remove a coupon by code. No-op when unknown. */
+  deleteCoupon(code: string): void {
+    this.coupons.delete(code.toUpperCase());
     this.persist();
   }
 }

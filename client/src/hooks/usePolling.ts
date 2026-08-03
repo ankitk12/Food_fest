@@ -2,14 +2,12 @@
  * usePolling — a React hook that repeatedly invokes an async function on a
  * fixed interval and exposes the latest resolved value.
  *
- * The default interval is 3000ms (~3s). Because the design relies on
- * short-interval polling to satisfy the "within 5 seconds" freshness
- * acceptance criteria (order status 6.4, metrics 7.5, trending 11.2), a 3s
- * cadence guarantees a refresh well inside that 5s window.
+ * The default interval is 10000ms (10s). Setting intervalMs to 0 fetches
+ * once on mount without recurring polling.
  *
  * Behavior:
  *   - Fetches once immediately on mount (and whenever `fn`/`intervalMs`/
- *     `enabled` change), then every `intervalMs` thereafter.
+ *     `enabled` change), then every `intervalMs` thereafter if `intervalMs > 0`.
  *   - Ignores results from stale in-flight requests (guards against overlap
  *     and post-unmount state updates).
  *   - `enabled: false` pauses polling without unmounting.
@@ -18,11 +16,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** Default polling interval in milliseconds (~3 seconds). */
-export const DEFAULT_POLL_INTERVAL_MS = 3000;
+/** Default polling interval in milliseconds (10 seconds). */
+export const DEFAULT_POLL_INTERVAL_MS = 10000;
 
 export interface UsePollingOptions {
-  /** Interval between polls in milliseconds. Defaults to 3000ms. */
+  /** Interval between polls in milliseconds. Defaults to 10000ms. Set to 0 for a single fetch on mount. */
   intervalMs?: number;
   /** When false, polling is paused. Defaults to true. */
   enabled?: boolean;
@@ -90,8 +88,16 @@ export function usePolling<T>(
       };
     }
 
-    // Immediate fetch on mount/param change, then on the interval.
+    // Immediate fetch on mount/param change.
     void runFetch();
+
+    // If intervalMs is 0 or negative, do not set up a recurring timer.
+    if (intervalMs <= 0) {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
     const timer = setInterval(() => {
       void runFetch();
     }, intervalMs);

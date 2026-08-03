@@ -12,7 +12,6 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { Store } from "./store.js";
-import { MockGateway } from "./gateways/mock-gateway.js";
 import type { CartItem, Stall } from "../../types/index.js";
 
 const STALL: Stall = { id: "stall-c", name: "Customer Stall", qrSlug: "c" };
@@ -22,7 +21,7 @@ const CART: CartItem[] = [
 
 function buildApp() {
   const store = new Store({ stalls: [STALL], foodItems: [] });
-  const app = createApp({ store, paymentGateway: new MockGateway() });
+  const app = createApp({ store });
   return { app, store };
 }
 

@@ -49,7 +49,7 @@ export function HomePage(): JSX.Element {
 
   return (
     <main className="home" ref={containerRef}>
-      <HeroSection />
+      <HeroSection items={menuItems} />
       <TickerMarquee items={tickerItems} />
 
       <section className="home-order" style={{ padding: "48px 6vw 96px" }}>

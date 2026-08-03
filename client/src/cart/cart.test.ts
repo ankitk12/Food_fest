@@ -59,9 +59,6 @@ describe("cart helpers", () => {
     availableQuantity: 10,
     price: 180,
     stallId: "stall-1",
-    spice: "medium",
-    flavor: "savory",
-    portion: "regular",
   };
 
   it("adds a new item with quantity one", () => {

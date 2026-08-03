@@ -48,13 +48,20 @@ model Order {
   gatewayRef    String?
   customerId    String
   createdAt     String
-  spinUsed      Boolean
-  spinReward    String?
   pointsUsed    Int?
   discount      Float?
+  couponCode    String?
   deliveryType  String?
   deskLocation  String?
   floorNo       String?
+}
+
+/// A discount coupon created by the admin (e.g. SAVE10 with 10% off on orders above 200).
+model Coupon {
+  code            String  @id
+  discountPercent Float
+  minOrderValue   Float
+  active          Boolean @default(true)
 }
 
 /// Per-item stock/price overrides applied on top of the seeded catalogue.
@@ -77,7 +84,4 @@ model FoodItem {
   availableQuantity Int
   price             Float
   stallId           String
-  spice             String
-  flavor            String
-  portion           String
 }

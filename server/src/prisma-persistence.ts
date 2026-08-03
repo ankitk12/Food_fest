@@ -1,17 +1,7 @@
 /**
  * Prisma/Postgres persistence for the ByteBites Store, mapped to per-entity
- * relational tables (Customer, Wallet, Referral, Order, ItemState, CustomItem)
+ * relational tables (Customer, Wallet, Order, ItemState, CustomItem)
  * rather than a single JSON blob.
- *
- * The Store's `PersistenceAdapter` seam is synchronous while Prisma is async, so:
- *   - `init()` (awaited once at startup, before the Store is built) reads every
- *     table and reconstructs the in-memory `StoreSnapshot`.
- *   - `load()` synchronously returns that reconstructed snapshot.
- *   - `save()` synchronously updates the cache and enqueues an async
- *     write-through on a serialized chain. Because the Store always emits the
- *     complete snapshot, each write replaces the table contents inside a single
- *     transaction (data volumes are tiny for the festival demo). Failures are
- *     logged, not thrown, so a transient DB blip never fails a request.
  */
 
 import { PrismaClient, Prisma } from "@prisma/client";
@@ -21,13 +11,14 @@ import {
   type StoreSnapshot,
 } from "./persistence.js";
 import type { OrderRepo } from "./order-repo.js";
+import { PrismaCouponRepo, PrismaCustomerRepo, PrismaWalletRepo, PrismaFoodItemRepo } from "./prisma-repos.js";
+import type { CouponRepo, CustomerRepo, WalletRepo, FoodItemRepo } from "./repos.js";
 import type {
   CartItem,
   FoodItem,
   Order,
   OrderStatus,
   PaymentMethod,
-  SpinReward,
 } from "../../types/index.js";
 
 export class PrismaPersistence implements PersistenceAdapter {
@@ -46,13 +37,9 @@ export class PrismaPersistence implements PersistenceAdapter {
    * `load()` can return the restored state.
    */
   async init(): Promise<void> {
-    // NB: orders are intentionally NOT loaded into the snapshot. They are owned
-    // by `PrismaOrderRepo`, which reads/writes the Order table directly per
-    // request so orders stay consistent across concurrent serverless instances.
-    const [customers, wallets, referrals, itemStates] = await Promise.all([
+    const [customers, wallets, itemStates] = await Promise.all([
       this.prisma.customer.findMany(),
       this.prisma.wallet.findMany(),
-      this.prisma.referral.findMany(),
       this.prisma.itemState.findMany(),
     ]);
 
@@ -67,20 +54,12 @@ export class PrismaPersistence implements PersistenceAdapter {
         customerId: w.customerId,
         foodCoins: w.foodCoins,
       })),
-      referrals: referrals.map((r) => ({
-        customerId: r.customerId,
-        link: r.link,
-        creditedReferredIds: r.creditedReferredIds,
-      })),
-      // orders omitted on purpose — see note above (owned by PrismaOrderRepo).
       itemQuantities: Object.fromEntries(
         itemStates.map((i) => [i.itemId, i.quantity])
       ),
       itemPrices: Object.fromEntries(
         itemStates.map((i) => [i.itemId, i.price])
       ),
-      // Custom items live in the FoodItem catalogue table (loaded as the seed
-      // catalogue at startup), so there is nothing to restore separately here.
     };
 
     this.latest = snapshot;
@@ -92,74 +71,69 @@ export class PrismaPersistence implements PersistenceAdapter {
 
   save(snapshot: StoreSnapshot): void {
     this.latest = snapshot;
-    this.writeChain = this.writeChain
-      .then(() => this.persistAll(snapshot))
-      .catch((err: unknown) => {
-        console.error("Failed to persist state to Postgres:", err);
-      });
   }
 
-  /** Replace all table contents with the given snapshot in one transaction. */
+  /** Upsert all snapshot items into PostgreSQL atomically without deleting tables. */
   private async persistAll(s: StoreSnapshot): Promise<void> {
     const itemIds = new Set<string>([
       ...Object.keys(s.itemQuantities),
       ...Object.keys(s.itemPrices),
     ]);
-    const itemStateData = Array.from(itemIds).map((itemId) => ({
-      itemId,
-      quantity: s.itemQuantities[itemId] ?? 0,
-      price: s.itemPrices[itemId] ?? 0,
-    }));
 
-    await this.prisma.$transaction([
-      // Clear everything first (no FK relations between these tables). The
-      // Order table is deliberately excluded: orders are managed row-by-row by
-      // PrismaOrderRepo, so a snapshot write must never touch (or clobber) them.
-      this.prisma.customer.deleteMany(),
-      this.prisma.wallet.deleteMany(),
-      this.prisma.referral.deleteMany(),
-      this.prisma.itemState.deleteMany(),
-      // Recreate from the current snapshot.
-      this.prisma.customer.createMany({
-        data: s.customers.map((c) => ({
-          mobile: c.mobile,
-          name: c.name,
-          email: c.email ?? null,
-        })),
-      }),
-      this.prisma.wallet.createMany({
-        data: s.wallets.map((w) => ({
-          customerId: w.customerId,
-          foodCoins: w.foodCoins,
-        })),
-      }),
-      this.prisma.referral.createMany({
-        data: s.referrals.map((r) => ({
-          customerId: r.customerId,
-          link: r.link,
-          creditedReferredIds: r.creditedReferredIds,
-        })),
-      }),
-      this.prisma.itemState.createMany({ data: itemStateData }),
-      // Custom items are persisted into the FoodItem catalogue table itself, so
-      // they are a first-class part of the catalogue on the next cold start.
-      ...s.customItems.map((i) =>
-        this.prisma.foodItem.upsert({
-          where: { id: i.id },
-          create: { ...i },
-          update: { ...i },
-        })
-      ),
-      // Deleted items (seeded or custom) are removed from the catalogue table
-      // so the deletion survives a restart.
-      ...(s.deletedItemIds.length > 0
+    const customerUpserts = s.customers.map((c) =>
+      this.prisma.customer.upsert({
+        where: { mobile: c.mobile },
+        create: { mobile: c.mobile, name: c.name, email: c.email ?? null },
+        update: { name: c.name, email: c.email ?? null },
+      })
+    );
+
+    const walletUpserts = s.wallets.map((w) =>
+      this.prisma.wallet.upsert({
+        where: { customerId: w.customerId },
+        create: { customerId: w.customerId, foodCoins: w.foodCoins },
+        update: { foodCoins: w.foodCoins },
+      })
+    );
+
+    const itemStateUpserts = Array.from(itemIds).map((itemId) => {
+      const quantity = s.itemQuantities[itemId] ?? 0;
+      const price = s.itemPrices[itemId] ?? 0;
+      return this.prisma.itemState.upsert({
+        where: { itemId },
+        create: { itemId, quantity, price },
+        update: { quantity, price },
+      });
+    });
+
+    const customItemUpserts = s.customItems.map((i) =>
+      this.prisma.foodItem.upsert({
+        where: { id: i.id },
+        create: { ...i },
+        update: { ...i },
+      })
+    );
+
+    const itemDeletions =
+      s.deletedItemIds.length > 0
         ? [
-            this.prisma.foodItem.deleteMany({
-              where: { id: { in: s.deletedItemIds } },
-            }),
-          ]
-        : []),
-    ]);
+          this.prisma.foodItem.deleteMany({
+            where: { id: { in: s.deletedItemIds } },
+          }),
+        ]
+        : [];
+
+    const operations = [
+      ...customerUpserts,
+      ...walletUpserts,
+      ...itemStateUpserts,
+      ...customItemUpserts,
+      ...itemDeletions,
+    ];
+
+    if (operations.length > 0) {
+      await this.prisma.$transaction(operations);
+    }
   }
 
   /**
@@ -185,6 +159,22 @@ export class PrismaPersistence implements PersistenceAdapter {
     return new PrismaOrderRepo(this.prisma);
   }
 
+  createCustomerRepo(): CustomerRepo {
+    return new PrismaCustomerRepo(this.prisma);
+  }
+
+  createWalletRepo(): WalletRepo {
+    return new PrismaWalletRepo(this.prisma);
+  }
+
+  createFoodItemRepo(): FoodItemRepo {
+    return new PrismaFoodItemRepo(this.prisma);
+  }
+
+  createCouponRepo(): CouponRepo {
+    return new PrismaCouponRepo(this.prisma);
+  }
+
   /** Flush any pending write and close the connection (graceful shutdown). */
   async disconnect(): Promise<void> {
     await this.writeChain;
@@ -198,7 +188,7 @@ export class PrismaPersistence implements PersistenceAdapter {
  * immediately visible on another and are never clobbered by a snapshot write.
  */
 export class PrismaOrderRepo implements OrderRepo {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) { }
 
   async list(): Promise<Order[]> {
     const rows = await this.prisma.order.findMany();
@@ -238,10 +228,9 @@ interface OrderRow {
   gatewayRef: string | null;
   customerId: string;
   createdAt: string;
-  spinUsed: boolean;
-  spinReward: string | null;
   pointsUsed: number | null;
   discount: number | null;
+  couponCode: string | null;
   deliveryType: string | null;
   deskLocation: string | null;
   floorNo: string | null;
@@ -259,10 +248,9 @@ function orderToRow(o: Order): Prisma.OrderCreateManyInput {
     gatewayRef: o.gatewayRef ?? null,
     customerId: o.customerId,
     createdAt: o.createdAt,
-    spinUsed: o.spinUsed,
-    spinReward: o.spinReward ?? null,
     pointsUsed: o.pointsUsed ?? null,
     discount: o.discount ?? null,
+    couponCode: o.couponCode ?? null,
     deliveryType: o.deliveryType ?? null,
     deskLocation: o.deskLocation ?? null,
     floorNo: o.floorNo ?? null,
@@ -281,10 +269,9 @@ function rowToOrder(row: OrderRow): Order {
     ...(row.gatewayRef ? { gatewayRef: row.gatewayRef } : {}),
     customerId: row.customerId,
     createdAt: row.createdAt,
-    spinUsed: row.spinUsed,
-    ...(row.spinReward ? { spinReward: row.spinReward as SpinReward } : {}),
     ...(row.pointsUsed !== null ? { pointsUsed: row.pointsUsed } : {}),
     ...(row.discount !== null ? { discount: row.discount } : {}),
+    ...(row.couponCode ? { couponCode: row.couponCode } : {}),
     ...(row.deliveryType
       ? { deliveryType: row.deliveryType as Order["deliveryType"] }
       : {}),
@@ -302,9 +289,6 @@ function rowToFoodItem(row: {
   availableQuantity: number;
   price: number;
   stallId: string;
-  spice: string;
-  flavor: string;
-  portion: string;
 }): FoodItem {
   return {
     id: row.id,
@@ -315,8 +299,5 @@ function rowToFoodItem(row: {
     availableQuantity: row.availableQuantity,
     price: row.price,
     stallId: row.stallId,
-    spice: row.spice as FoodItem["spice"],
-    flavor: row.flavor as FoodItem["flavor"],
-    portion: row.portion as FoodItem["portion"],
   };
 }

@@ -43,9 +43,6 @@ const sampleItem: FoodItem = {
   availableQuantity: 40,
   price: 180,
   stallId: "stall-1",
-  spice: "medium",
-  flavor: "savory",
-  portion: "regular",
 };
 
 beforeEach(() => {

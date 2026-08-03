@@ -17,24 +17,17 @@
 import fc from "fast-check";
 import type {
   CartItem,
+  Coupon,
   FoodItem,
-  Flavor,
   Metrics,
   Order,
   OrderStatus,
   PaymentMethod,
-  Portion,
-  Preferences,
-  Referral,
-  Spice,
   Stall,
   Wallet,
 } from "./index.js";
 import {
-  FLAVOR_VALUES,
   ORDER_STATUS_SEQUENCE,
-  PORTION_VALUES,
-  SPICE_VALUES,
 } from "./index.js";
 
 // --- Primitive helpers -----------------------------------------------------
@@ -64,11 +57,6 @@ export const priceArb: fc.Arbitrary<number> = fc
   .integer({ min: 1, max: 500000 })
   .map((paise) => paise / 100);
 
-export const spiceArb: fc.Arbitrary<Spice> = fc.constantFrom(...SPICE_VALUES);
-export const flavorArb: fc.Arbitrary<Flavor> = fc.constantFrom(...FLAVOR_VALUES);
-export const portionArb: fc.Arbitrary<Portion> = fc.constantFrom(
-  ...PORTION_VALUES
-);
 export const orderStatusArb: fc.Arbitrary<OrderStatus> = fc.constantFrom(
   ...ORDER_STATUS_SEQUENCE
 );
@@ -97,9 +85,6 @@ export function foodItemArb(
     availableQuantity: quantityArb,
     price: priceArb,
     stallId: stallIdArb,
-    spice: spiceArb,
-    flavor: flavorArb,
-    portion: portionArb,
   });
 }
 
@@ -131,14 +116,7 @@ export const nonEmptyCartArb: fc.Arbitrary<CartItem[]> = fc.array(cartItemArb, {
   maxLength: 30,
 });
 
-// --- Preferences -----------------------------------------------------------
 
-export const preferencesArb: fc.Arbitrary<Preferences> =
-  fc.record<Preferences>({
-    hunger: portionArb,
-    spice: spiceArb,
-    taste: flavorArb,
-  });
 
 // --- Stalls ----------------------------------------------------------------
 
@@ -243,7 +221,6 @@ export function orderArb(options: OrderArbOptions = {}): fc.Arbitrary<Order> {
       gatewayRef: fc.option(idArb, { nil: undefined }),
       customerId: idArb,
       createdAt: createdAtArb,
-      spinUsed: fc.boolean(),
     })
     .map<Order>((o) => ({
       ...o,
@@ -271,26 +248,6 @@ export const walletArb: fc.Arbitrary<Wallet> = fc.record<Wallet>({
   foodCoins: walletBalanceArb,
 });
 
-// --- Referral scenarios ----------------------------------------------------
-
-export const referralArb: fc.Arbitrary<Referral> = fc.record<Referral>({
-  customerId: idArb,
-  link: idArb,
-  creditedReferredIds: fc.array(idArb, { minLength: 0, maxLength: 10 }),
-});
-
-/**
- * A referral scenario: a referring customer plus a list of referred customer
- * ids (which may contain duplicates to exercise idempotent crediting).
- */
-export const referralScenarioArb: fc.Arbitrary<{
-  referrer: string;
-  referredIds: string[];
-}> = fc.record({
-  referrer: idArb,
-  referredIds: fc.array(idArb, { minLength: 0, maxLength: 12 }),
-});
-
 // --- Ratings & metrics -----------------------------------------------------
 
 /** Rating inputs (0..5) for satisfaction-score computation. */
@@ -305,4 +262,13 @@ export const metricsArb: fc.Arbitrary<Metrics> = fc.record<Metrics>({
   digitalPaymentPercentage: fc.float({ min: 0, max: 100, noNaN: true }),
   bestSellingProduct: fc.option(nameArb, { nil: null }),
   customerSatisfactionScore: fc.float({ min: 0, max: 5, noNaN: true }),
+});
+
+// --- Coupons ---------------------------------------------------------------
+
+export const couponArb: fc.Arbitrary<Coupon> = fc.record<Coupon>({
+  code: fc.string({ minLength: 3, maxLength: 10 }).map((s) => s.toUpperCase()),
+  discountPercent: fc.integer({ min: 1, max: 50 }),
+  minOrderValue: fc.integer({ min: 0, max: 1000 }),
+  active: fc.boolean(),
 });

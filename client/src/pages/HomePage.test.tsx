@@ -15,18 +15,26 @@ import * as api from "../api/client.js";
 import { CartProvider } from "../cart/CartContext.js";
 import { HomePage } from "./HomePage.js";
 
-const sampleItem: FoodItem = {
+const sampleItem1: FoodItem = {
   id: "item-1",
+  name: "Masala Chai",
+  imageUrl: "https://example.com/c.jpg",
+  description: "Hot spiced tea.",
+  rating: 4.8,
+  availableQuantity: 50,
+  price: 15,
+  stallId: "stall-1",
+};
+
+const sampleItem2: FoodItem = {
+  id: "item-2",
   name: "Paneer Tikka",
   imageUrl: "https://example.com/p.jpg",
   description: "Char-grilled cottage cheese.",
   rating: 4.6,
   availableQuantity: 40,
-  price: 180,
+  price: 80,
   stallId: "stall-1",
-  spice: "medium",
-  flavor: "savory",
-  portion: "regular",
 };
 
 vi.mock("../api/client.js", async () => {
@@ -50,7 +58,7 @@ function renderHome(): void {
 
 beforeEach(() => {
   getAllItemsMock.mockReset();
-  getAllItemsMock.mockResolvedValue([sampleItem]);
+  getAllItemsMock.mockResolvedValue([sampleItem1, sampleItem2]);
 });
 
 afterEach(() => {
@@ -77,9 +85,27 @@ describe("HomePage — Invest-A-Bite redesign", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the price range '₹15–80' (Req 3.4)", () => {
+  it("renders the price range '₹15–80' dynamically based on lowest and highest prices (Req 3.4)", async () => {
     renderHome();
-    expect(screen.getByText("₹15–80")).toBeInTheDocument();
+    expect(await screen.findByText("₹15–80")).toBeInTheDocument();
+  });
+
+  it("renders custom dynamic price range when items have different lowest and highest prices", async () => {
+    getAllItemsMock.mockResolvedValue([
+      { ...sampleItem1, price: 25 },
+      { ...sampleItem2, price: 150 },
+    ]);
+    renderHome();
+    expect(await screen.findByText("₹25–150")).toBeInTheDocument();
+  });
+
+  it("renders single price when lowest and highest price are equal", async () => {
+    getAllItemsMock.mockResolvedValue([
+      { ...sampleItem1, price: 50 },
+      { ...sampleItem2, price: 50 },
+    ]);
+    renderHome();
+    expect(await screen.findByText("₹50")).toBeInTheDocument();
   });
 
   it("renders '▲ Market open' status (Req 3.5)", () => {

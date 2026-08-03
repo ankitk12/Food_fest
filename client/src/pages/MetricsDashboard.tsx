@@ -21,7 +21,7 @@ import { formatINR } from "../format.js";
 
 export function MetricsDashboard(): JSX.Element {
   const fetchMetrics = useCallback(() => getMetrics(), []);
-  const { data, error, loading } = usePolling<Metrics>(fetchMetrics);
+  const { data, error, loading } = usePolling<Metrics>(fetchMetrics, { intervalMs: 0 });
 
   return (
     <main className="metrics-dashboard">

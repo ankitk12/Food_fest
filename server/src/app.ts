@@ -18,9 +18,7 @@ import type {
   CartItem,
   Customer,
   FoodItem,
-  NotificationGateway,
   Order,
-  PaymentGateway,
 } from "../../types/index.js";
 import type { Store } from "./store.js";
 import { StoreOrderRepo, type OrderRepo } from "./order-repo.js";
@@ -30,55 +28,32 @@ import { issueToken } from "../../domain/tokens.js";
 import { nextStatus } from "../../domain/order-status.js";
 import { computeMetrics } from "../../domain/metrics.js";
 import { rankTrending } from "../../domain/trending.js";
-import { recommend } from "../../domain/ai-chef.js";
-import { spin } from "../../domain/spin.js";
 import { normalizeMobile, isValidMobile } from "../../domain/mobile.js";
-import { MockNotificationGateway } from "./notifications/mock-notification-gateway.js";
-import type { Preferences, Referral } from "../../types/index.js";
+
+import {
+  StoreCustomerRepo,
+  StoreWalletRepo,
+  StoreFoodItemRepo,
+  StoreCouponRepo,
+  type CustomerRepo,
+  type WalletRepo,
+  type FoodItemRepo,
+  type CouponRepo,
+} from "./repos.js";
 
 /** Collaborators required to build the app. */
 export interface AppDependencies {
   store: Store;
-  /**
-   * Optional payment gateway. No longer used by checkout — the single-day
-   * event collects UPI/cash off-platform and marks orders paid manually — but
-   * kept for backwards compatibility with existing callers/tests.
-   */
-  paymentGateway?: PaymentGateway;
   /**
    * Order data access. Defaults to a Store-backed repo (in-memory / JSON
    * backend). The Prisma/Postgres backend injects a repo that reads/writes the
    * Order table directly so orders stay consistent across serverless instances.
    */
   orderRepo?: OrderRepo;
-  /**
-   * Notification gateway used to send an order confirmation after a successful
-   * checkout. Injectable so tests use a deterministic mock; defaults to
-   * `MockNotificationGateway`.
-   */
-  notificationGateway?: NotificationGateway;
-  /**
-   * Random number generator used by the Spin & Win endpoint to draw a reward.
-   * Injectable so tests can force a specific reward deterministically; defaults
-   * to `Math.random`.
-   */
-  rng?: () => number;
-}
-
-/**
- * The number of FoodCoins credited to a referring customer for each referred
- * customer's first successful order (Requirement 10.2).
- */
-const REFERRAL_REWARD_COINS = 10;
-
-/**
- * Build the unique referral link for a customer. The link is deterministic in
- * the customerId, which is itself unique per customer, guaranteeing a
- * non-empty link that is never shared between two distinct customers
- * (Requirement 10.1).
- */
-function referralLinkFor(customerId: string): string {
-  return `https://bytebites.app/join?ref=${encodeURIComponent(customerId)}`;
+  customerRepo?: CustomerRepo;
+  walletRepo?: WalletRepo;
+  foodItemRepo?: FoodItemRepo;
+  couponRepo?: CouponRepo;
 }
 
 /** The consistent error payload shape used by every API error response. */
@@ -88,15 +63,16 @@ export interface ApiError {
 }
 
 /**
- * Build a configured Express app around the provided store and payment
- * gateway. Each endpoint task registers its routes on the app created here.
+ * Build a configured Express app around the provided store.
+ * Each endpoint task registers its routes on the app created here.
  */
 export function createApp(deps: AppDependencies): Express {
   const { store } = deps;
   const orderRepo: OrderRepo = deps.orderRepo ?? new StoreOrderRepo(store);
-  const notificationGateway =
-    deps.notificationGateway ?? new MockNotificationGateway();
-  const rng = deps.rng ?? Math.random;
+  const customerRepo: CustomerRepo = deps.customerRepo ?? new StoreCustomerRepo(store);
+  const walletRepo: WalletRepo = deps.walletRepo ?? new StoreWalletRepo(store);
+  const foodItemRepo: FoodItemRepo = deps.foodItemRepo ?? new StoreFoodItemRepo(store);
+  const couponRepo: CouponRepo = deps.couponRepo ?? new StoreCouponRepo(store);
   const app = express();
 
   app.use(express.json());
@@ -239,6 +215,7 @@ export function createApp(deps: AppDependencies): Express {
         deliveryType?: unknown;
         deskLocation?: unknown;
         floorNo?: unknown;
+        couponCode?: unknown;
       };
 
       const items = Array.isArray(body.items) ? (body.items as CartItem[]) : [];
@@ -257,6 +234,8 @@ export function createApp(deps: AppDependencies): Express {
         typeof body.redeemPoints === "number" && body.redeemPoints > 0
           ? Math.floor(body.redeemPoints)
           : 0;
+      const couponCodeRaw =
+        typeof body.couponCode === "string" ? body.couponCode.trim().toUpperCase() : null;
       // The customer identity is their mobile number, normalized to a canonical
       // form so wallet/referral/order association all key off the same value.
       // A checkout for an unregistered mobile still works — a minimal customer
@@ -294,15 +273,7 @@ export function createApp(deps: AppDependencies): Express {
       // out of stock, even if the user's client hasn't refreshed yet.
       for (const cartItem of items) {
         const foodItem = store.getFoodItem(cartItem.itemId);
-        if (!foodItem) {
-          const errBody: ApiError = {
-            error: `Item "${cartItem.name}" is no longer available`,
-            code: "ITEM_UNAVAILABLE",
-          };
-          res.status(400).json(errBody);
-          return;
-        }
-        if (foodItem.availableQuantity < cartItem.quantity) {
+        if (foodItem && foodItem.availableQuantity < cartItem.quantity) {
           const errBody: ApiError = {
             error:
               foodItem.availableQuantity === 0
@@ -321,7 +292,26 @@ export function createApp(deps: AppDependencies): Express {
       // Apply reward points discount if requested (2 points = ₹1).
       let discount = 0;
       let pointsUsed = 0;
-      if (redeemPoints > 0) {
+      let appliedCouponCode: string | undefined;
+
+      if (couponCodeRaw) {
+        // Coupon takes priority over FoodCoins if both are provided.
+        const coupon = await couponRepo.get(couponCodeRaw);
+        if (!coupon || !coupon.active) {
+          res.status(400).json({ error: "Invalid or expired coupon code", code: "COUPON_INVALID" });
+          return;
+        }
+        if (subtotal < coupon.minOrderValue) {
+          res.status(400).json({
+            error: `Minimum order value of ₹${coupon.minOrderValue} required for coupon ${coupon.code}`,
+            code: "MIN_ORDER_NOT_MET",
+          });
+          return;
+        }
+        discount = Math.round((subtotal * coupon.discountPercent) / 100 * 100) / 100;
+        discount = Math.min(discount, subtotal);
+        appliedCouponCode = coupon.code;
+      } else if (redeemPoints > 0) {
         const wallet = store.getWallet(customerId);
         const usable = Math.min(redeemPoints, wallet.foodCoins);
         discount = usable * 0.50; // 2 points = ₹1
@@ -331,17 +321,9 @@ export function createApp(deps: AppDependencies): Express {
       }
       const total = Math.max(0, subtotal - discount);
 
-      // No payment gateway is integrated (this app runs for a single-day
-      // event). Both UPI (paid by the customer via the QR / their UPI app) and
-      // cash are collected off-platform, so every order is created as PENDING
-      // and later marked "received" by staff from the admin dashboard once the
-      // money actually arrives. There is therefore no online failure path here.
-
       // Deduct redeemed reward points from the wallet.
       if (pointsUsed > 0) {
-        const wallet = store.getWallet(customerId);
-        wallet.foodCoins = Math.max(0, wallet.foodCoins - pointsUsed);
-        store.saveWallet(wallet);
+        await walletRepo.deductCoins(customerId, pointsUsed);
       }
 
       // Success: issue a unique token against the store's existing tokens,
@@ -354,15 +336,13 @@ export function createApp(deps: AppDependencies): Express {
         items,
         total,
         status: "Craving Funded",
-        // Pending until staff confirm the cash/UPI payment was received; no
-        // gateway means we can't auto-verify payment.
         paid: false,
         paymentMethod: payWithCash ? "cash" : "UPI",
         customerId,
         createdAt: new Date().toISOString(),
-        spinUsed: false,
         pointsUsed,
         discount,
+        ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
         deliveryType: deliverToDesk ? "desk" : "stall",
         ...(deliverToDesk ? { deskLocation, floorNo } : {}),
       };
@@ -381,46 +361,26 @@ export function createApp(deps: AppDependencies): Express {
       }
 
       const coinsEarned = coinsForOrder(total);
-      const wallet = store.getWallet(customerId);
-      wallet.foodCoins += coinsEarned;
-      store.saveWallet(wallet);
+      if (coinsEarned > 0) {
+        await walletRepo.addCoins(customerId, coinsEarned);
+      }
 
       // Auto-create a minimal customer for a checkout by an unregistered mobile
       // so the identity exists for later lookups (checkout does not require a
       // prior registration). Existing customers are left untouched.
       if (
         isValidMobile(customerId) &&
-        store.getCustomer(customerId) === undefined
+        !(await customerRepo.get(customerId))
       ) {
-        store.saveCustomer({ mobile: customerId, name: "" });
-      }
-
-      // Send an order confirmation to the customer's mobile. A notification
-      // failure must NOT fail the order: any error is caught and surfaced as a
-      // `notified` flag on the response while the checkout still succeeds.
-      const stall = store.getStall(stallId);
-      let notified = false;
-      try {
-        const result = await notificationGateway.sendOrderConfirmation({
-          toMobile: customerId,
-          token,
-          total,
-          items,
-          stallName: stall?.name,
-        });
-        notified = result.sent;
-      } catch {
-        notified = false;
+        await customerRepo.save({ mobile: customerId, name: "" });
       }
 
       res.status(201).json({
         token,
         status: order.status,
         coinsEarned,
-        spinAvailable: !order.spinUsed,
         total,
         discount,
-        notified,
       });
     }
   );
@@ -646,20 +606,6 @@ export function createApp(deps: AppDependencies): Express {
       availableQuantity = Math.floor(body.availableQuantity);
     }
 
-    const spice: FoodItem["spice"] =
-      body.spice === "mild" || body.spice === "medium" || body.spice === "hot"
-        ? body.spice
-        : "medium";
-    const flavor: FoodItem["flavor"] =
-      body.flavor === "sweet" || body.flavor === "savory"
-        ? body.flavor
-        : "savory";
-    const portion: FoodItem["portion"] =
-      body.portion === "light" ||
-      body.portion === "regular" ||
-      body.portion === "hearty"
-        ? body.portion
-        : "regular";
     const rating =
       typeof body.rating === "number" &&
       Number.isFinite(body.rating) &&
@@ -676,9 +622,6 @@ export function createApp(deps: AppDependencies): Express {
       availableQuantity,
       price: body.price,
       stallId,
-      spice,
-      flavor,
-      portion,
     });
 
     res.status(201).json(created);
@@ -782,46 +725,6 @@ export function createApp(deps: AppDependencies): Express {
       patch.rating = body.rating;
     }
 
-    if (body.spice !== undefined) {
-      if (body.spice !== "mild" && body.spice !== "medium" && body.spice !== "hot") {
-        const errBody: ApiError = {
-          error: "spice must be one of mild, medium, hot",
-          code: "INVALID_ITEM",
-        };
-        res.status(400).json(errBody);
-        return;
-      }
-      patch.spice = body.spice;
-    }
-
-    if (body.flavor !== undefined) {
-      if (body.flavor !== "sweet" && body.flavor !== "savory") {
-        const errBody: ApiError = {
-          error: "flavor must be one of sweet, savory",
-          code: "INVALID_ITEM",
-        };
-        res.status(400).json(errBody);
-        return;
-      }
-      patch.flavor = body.flavor;
-    }
-
-    if (body.portion !== undefined) {
-      if (
-        body.portion !== "light" &&
-        body.portion !== "regular" &&
-        body.portion !== "hearty"
-      ) {
-        const errBody: ApiError = {
-          error: "portion must be one of light, regular, hearty",
-          code: "INVALID_ITEM",
-        };
-        res.status(400).json(errBody);
-        return;
-      }
-      patch.portion = body.portion;
-    }
-
     if (typeof body.description === "string") {
       patch.description = body.description;
     }
@@ -839,7 +742,7 @@ export function createApp(deps: AppDependencies): Express {
   // `{ availableQuantity: number }`. Setting to 0 marks the item out of stock.
   app.patch(
     "/api/admin/items/:itemId/stock",
-    (req: Request, res: Response): void => {
+    async (req: Request, res: Response): Promise<void> => {
       const { itemId } = req.params;
       const body = req.body as { availableQuantity?: unknown };
 
@@ -867,6 +770,7 @@ export function createApp(deps: AppDependencies): Express {
         return;
       }
 
+      await foodItemRepo.updateStock(itemId, body.availableQuantity);
       store.setAvailableQuantity(itemId, body.availableQuantity);
       const updated = store.getFoodItem(itemId)!;
       res.status(200).json(updated);
@@ -883,7 +787,7 @@ export function createApp(deps: AppDependencies): Express {
   // production.
   app.patch(
     "/api/admin/items/:itemId/price",
-    (req: Request, res: Response): void => {
+    async (req: Request, res: Response): Promise<void> => {
       const { itemId } = req.params;
       const body = req.body as { price?: unknown };
 
@@ -901,7 +805,7 @@ export function createApp(deps: AppDependencies): Express {
         return;
       }
 
-      const item = store.getFoodItem(itemId);
+      const item = (await foodItemRepo.get(itemId)) ?? store.getFoodItem(itemId);
       if (!item) {
         const errBody: ApiError = {
           error: "Item not found",
@@ -911,6 +815,7 @@ export function createApp(deps: AppDependencies): Express {
         return;
       }
 
+      await foodItemRepo.updatePrice(itemId, body.price);
       store.setPrice(itemId, body.price);
       const updated = store.getFoodItem(itemId)!;
       res.status(200).json(updated);
@@ -926,8 +831,9 @@ export function createApp(deps: AppDependencies): Express {
   // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
   // for the festival demo and MUST be placed behind seller authentication in
   // production.
-  app.delete("/api/admin/items/:itemId", (req: Request, res: Response): void => {
+  app.delete("/api/admin/items/:itemId", async (req: Request, res: Response): Promise<void> => {
     const { itemId } = req.params;
+    await foodItemRepo.delete(itemId);
     const deleted = store.deleteFoodItem(itemId);
     if (!deleted) {
       const errBody: ApiError = {
@@ -970,6 +876,87 @@ export function createApp(deps: AppDependencies): Express {
       totalDiscount,
     });
   });
+
+  // --- GET /api/coupons ---------------------------------------------------
+  //
+  // Returns all active coupons. Public endpoint — the checkout page fetches
+  // this to display available coupons to the customer.
+  app.get("/api/coupons", async (_req: Request, res: Response): Promise<void> => {
+    const coupons = await couponRepo.list();
+    res.status(200).json(coupons.filter((c) => c.active));
+  });
+
+  // --- GET /api/admin/coupons ---------------------------------------------
+  //
+  // Returns all coupons (active + inactive) for the admin panel.
+  app.get("/api/admin/coupons", async (_req: Request, res: Response): Promise<void> => {
+    const coupons = await couponRepo.list();
+    res.status(200).json(coupons);
+  });
+
+  // --- POST /api/admin/coupons --------------------------------------------
+  //
+  // Create or update a coupon code.
+  app.post(
+    "/api/admin/coupons",
+    async (req: Request, res: Response): Promise<void> => {
+      const body = (req.body ?? {}) as {
+        code?: unknown;
+        discountPercent?: unknown;
+        minOrderValue?: unknown;
+        active?: unknown;
+      };
+      const code =
+        typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+      const discountPercent =
+        typeof body.discountPercent === "number" ? body.discountPercent : null;
+      const minOrderValue =
+        typeof body.minOrderValue === "number" ? body.minOrderValue : null;
+
+      if (!code) {
+        res.status(400).json({ error: "code is required", code: "VALIDATION_ERROR" });
+        return;
+      }
+      if (discountPercent === null || discountPercent <= 0 || discountPercent > 100) {
+        res.status(400).json({ error: "discountPercent must be between 1 and 100", code: "VALIDATION_ERROR" });
+        return;
+      }
+      if (minOrderValue === null || minOrderValue < 0) {
+        res.status(400).json({ error: "minOrderValue must be >= 0", code: "VALIDATION_ERROR" });
+        return;
+      }
+
+      const coupon = {
+        code,
+        discountPercent,
+        minOrderValue,
+        active: body.active !== false, // default to true
+      };
+      await couponRepo.save(coupon);
+      res.status(201).json(coupon);
+    }
+  );
+
+  // --- DELETE /api/admin/coupons/:code ------------------------------------
+  //
+  // Delete a coupon by code.
+  app.delete(
+    "/api/admin/coupons/:code",
+    async (req: Request, res: Response): Promise<void> => {
+      const code = req.params.code?.toUpperCase() ?? "";
+      if (!code) {
+        res.status(400).json({ error: "code is required", code: "VALIDATION_ERROR" });
+        return;
+      }
+      const existing = await couponRepo.get(code);
+      if (!existing) {
+        res.status(404).json({ error: "Coupon not found", code: "NOT_FOUND" });
+        return;
+      }
+      await couponRepo.delete(code);
+      res.status(200).json({ deleted: code });
+    }
+  );
 
   // --- GET /api/wallet/:customerId ----------------------------------------
   //
@@ -1025,92 +1012,7 @@ export function createApp(deps: AppDependencies): Express {
     }
   );
 
-  // --- GET /api/referral/:customerId --------------------------------------
-  //
-  // Returns the customer's referral record, creating (and persisting) one with
-  // a unique link on first access. The link is deterministic in the unique
-  // customerId, so it is non-empty and never shared between customers
-  // (Requirement 10.1).
-  //
-  // Validates: Requirements 10.1
-  app.get(
-    "/api/referral/:customerId",
-    (req: Request, res: Response): void => {
-      const { customerId } = req.params;
-      let referral = store.getReferral(customerId);
-      if (!referral) {
-        referral = {
-          customerId,
-          link: referralLinkFor(customerId),
-          creditedReferredIds: [],
-        };
-        store.saveReferral(referral);
-      }
-      res.status(200).json(referral);
-    }
-  );
 
-  // --- POST /api/referral/claim -------------------------------------------
-  //
-  // Credits the referrer 10 FoodCoins for a referred customer's first
-  // successful order. Crediting is idempotent per referred customer: the
-  // referred id is recorded in the referrer's `creditedReferredIds` and a
-  // repeat claim for the same referred customer credits nothing further
-  // (Requirements 10.2, 10.3).
-  //
-  // Validates: Requirements 10.2, 10.3
-  app.post("/api/referral/claim", (req: Request, res: Response): void => {
-    const body = (req.body ?? {}) as {
-      referrerId?: unknown;
-      referredId?: unknown;
-    };
-    const referrerId =
-      typeof body.referrerId === "string" ? body.referrerId : "";
-    const referredId =
-      typeof body.referredId === "string" ? body.referredId : "";
-
-    if (referrerId === "" || referredId === "") {
-      const errBody: ApiError = {
-        error: "referrerId and referredId are required",
-        code: "INVALID_REFERRAL_CLAIM",
-      };
-      res.status(400).json(errBody);
-      return;
-    }
-
-    // Load or create the referrer's referral record.
-    let referral: Referral =
-      store.getReferral(referrerId) ?? {
-        customerId: referrerId,
-        link: referralLinkFor(referrerId),
-        creditedReferredIds: [],
-      };
-
-    // Idempotency: only credit the first time we see this referred customer.
-    const alreadyCredited = referral.creditedReferredIds.includes(referredId);
-    let credited = 0;
-    if (!alreadyCredited) {
-      referral = {
-        ...referral,
-        creditedReferredIds: [...referral.creditedReferredIds, referredId],
-      };
-      store.saveReferral(referral);
-
-      const wallet = store.getWallet(referrerId);
-      wallet.foodCoins += REFERRAL_REWARD_COINS;
-      store.saveWallet(wallet);
-      credited = REFERRAL_REWARD_COINS;
-    }
-
-    const wallet = store.getWallet(referrerId);
-    res.status(200).json({
-      referrerId,
-      referredId,
-      credited,
-      alreadyCredited,
-      balance: wallet.foodCoins,
-    });
-  });
 
   // --- GET /api/metrics ----------------------------------------------------
   //
@@ -1163,73 +1065,6 @@ export function createApp(deps: AppDependencies): Express {
         : store.getFoodItems();
 
     res.status(200).json(recommend(prefs, items));
-  });
-
-  // --- POST /api/orders/:token/spin ---------------------------------------
-  //
-  // Performs the single Spin & Win draw for a paid order. Spins are only
-  // available for paid orders (unpaid orders are rejected with 403); the first
-  // spin on a paid order succeeds, draws a reward via the spin domain using the
-  // injected rng, applies the reward's effect to the customer's account, and
-  // marks the order's single spin used. Any further spin attempt on the same
-  // order is rejected with 409 (Requirements 13.1, 13.3, 13.4).
-  //
-  // Reward effects applied to the account:
-  //   - "double FoodCoins": doubles the customer's current FoodCoins balance.
-  //   - "5% discount" / "free drink" / "lucky draw ticket": recorded on the
-  //     order via `spinReward`; the wallet balance is unaffected.
-  //
-  // Validates: Requirements 13.1, 13.3, 13.4
-  app.post("/api/orders/:token/spin", async (req: Request, res: Response): Promise<void> => {
-    const { token } = req.params;
-    const order = await orderRepo.get(token);
-    if (!order) {
-      const errBody: ApiError = {
-        error: "Order not found",
-        code: "ORDER_NOT_FOUND",
-      };
-      res.status(404).json(errBody);
-      return;
-    }
-
-    // Unpaid orders cannot spin (Req 13.1).
-    if (!order.paid) {
-      const errBody: ApiError = {
-        error: "Spin is only available for paid orders",
-        code: "ORDER_NOT_PAID",
-      };
-      res.status(403).json(errBody);
-      return;
-    }
-
-    // Exactly one spin per paid order (Req 13.4).
-    if (order.spinUsed) {
-      const errBody: ApiError = {
-        error: "This order's spin has already been used",
-        code: "SPIN_ALREADY_USED",
-      };
-      res.status(409).json(errBody);
-      return;
-    }
-
-    // Draw the reward and apply its effect to the account (Req 13.3).
-    const reward = spin(rng);
-    const wallet = store.getWallet(order.customerId);
-    if (reward === "double FoodCoins") {
-      wallet.foodCoins *= 2;
-      store.saveWallet(wallet);
-    }
-
-    order.spinUsed = true;
-    order.spinReward = reward;
-    await orderRepo.save(order);
-
-    res.status(200).json({
-      token: order.token,
-      reward,
-      spinUsed: order.spinUsed,
-      balance: store.getWallet(order.customerId).foodCoins,
-    });
   });
 
   return app;

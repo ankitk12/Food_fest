@@ -6,7 +6,7 @@
  * adjust price. Only accessible to the admin user (mobile 9512311001).
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   getAdminItems,
@@ -14,10 +14,13 @@ import {
   createItem,
   updateItem,
   deleteItem,
+  getAdminCoupons,
+  createAdminCoupon,
+  deleteAdminCoupon,
   type CreateItemRequest,
   type UpdateItemRequest,
 } from "../api/client.js";
-import type { FoodItem } from "../../../types/index.js";
+import type { Coupon, FoodItem } from "../../../types/index.js";
 import { useCustomer } from "../customer/CustomerContext.js";
 import { usePolling } from "../hooks/usePolling.js";
 import { ADMIN_MOBILE } from "../constants.js";
@@ -91,6 +94,7 @@ function StockPanel(): JSX.Element {
 
       <AddItemForm onCreated={refresh} />
 
+
       {error && !items && (
         <p role="alert" className="admin-error">
           Couldn&apos;t load items. Retrying…
@@ -132,6 +136,8 @@ function StockPanel(): JSX.Element {
           }}
         />
       )}
+
+      <CouponPanel />
     </main>
   );
 }
@@ -587,3 +593,138 @@ function StockCard({
 }
 
 export default StockManagementView;
+
+// --- Coupon Management Panel -----------------------------------------------
+
+function CouponPanel(): JSX.Element {
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [discountPercent, setDiscountPercent] = useState("");
+  const [minOrderValue, setMinOrderValue] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  async function fetchCoupons(): Promise<void> {
+    try {
+      const data = await getAdminCoupons();
+      setCoupons(data);
+    } catch {
+      setError("Failed to load coupons.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void fetchCoupons(); }, []);
+
+  async function handleCreate(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    setCreateError(null);
+    const pct = parseFloat(discountPercent);
+    const minVal = parseFloat(minOrderValue);
+    if (!code.trim() || isNaN(pct) || isNaN(minVal)) {
+      setCreateError("Please fill in all fields with valid values.");
+      return;
+    }
+    setCreating(true);
+    try {
+      await createAdminCoupon({ code: code.trim().toUpperCase(), discountPercent: pct, minOrderValue: minVal });
+      setCode("");
+      setDiscountPercent("");
+      setMinOrderValue("");
+      await fetchCoupons();
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create coupon.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleDelete(couponCode: string): Promise<void> {
+    if (!window.confirm(`Delete coupon "${couponCode}"?`)) return;
+    try {
+      await deleteAdminCoupon(couponCode);
+      await fetchCoupons();
+    } catch {
+      setError("Failed to delete coupon.");
+    }
+  }
+
+  return (
+    <section className="admin-coupon-panel" data-testid="coupon-panel">
+      <h2 className="admin-section-title">Coupon Management</h2>
+
+      <form className="admin-coupon-form" onSubmit={(e) => void handleCreate(e)}>
+        <h3 className="admin-coupon-form-title">Create New Coupon</h3>
+        <div className="admin-coupon-form-fields">
+          <label className="admin-coupon-field">
+            <span>Coupon Code</span>
+            <input
+              type="text"
+              placeholder="e.g. SAVE10"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              data-testid="coupon-code-input"
+              required
+            />
+          </label>
+          <label className="admin-coupon-field">
+            <span>Discount %</span>
+            <input
+              type="number"
+              placeholder="e.g. 10"
+              value={discountPercent}
+              min={1}
+              max={100}
+              onChange={(e) => setDiscountPercent(e.target.value)}
+              data-testid="coupon-discount-input"
+              required
+            />
+          </label>
+          <label className="admin-coupon-field">
+            <span>Min Order (₹)</span>
+            <input
+              type="number"
+              placeholder="e.g. 200"
+              value={minOrderValue}
+              min={0}
+              onChange={(e) => setMinOrderValue(e.target.value)}
+              data-testid="coupon-minorder-input"
+              required
+            />
+          </label>
+        </div>
+        {createError && <p className="admin-error" role="alert">{createError}</p>}
+        <button type="submit" className="admin-coupon-submit" disabled={creating}>
+          {creating ? "Creating…" : "Create Coupon"}
+        </button>
+      </form>
+
+      <div className="admin-coupon-list">
+        {loading && <p role="status">Loading coupons…</p>}
+        {error && <p className="admin-error" role="alert">{error}</p>}
+        {!loading && coupons.length === 0 && <p className="admin-empty">No coupons yet.</p>}
+        {coupons.map((c) => (
+          <div key={c.code} className="admin-coupon-row" data-testid={`coupon-row-${c.code}`}>
+            <div className="admin-coupon-info">
+              <strong className="admin-coupon-code">{c.code}</strong>
+              <span className="admin-coupon-meta">
+                {c.discountPercent}% off · Min ₹{c.minOrderValue} · {c.active ? "Active" : "Inactive"}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="stock-card-btn stock-card-btn--delete"
+              onClick={() => void handleDelete(c.code)}
+              data-testid={`coupon-delete-${c.code}`}
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

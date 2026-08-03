@@ -3,7 +3,7 @@
  *
  * A file-backed Store must survive a "restart": mutating one Store and then
  * constructing a fresh Store over the same file must recover orders, wallets,
- * referrals, customers, and item-stock overrides. Tests use a unique temp file
+ * customers, and item-stock overrides. Tests use a unique temp file
  * (cleaned up afterwards) so they never touch or depend on the real shared
  * data file, and the default (no-persistence) Store must never write to disk.
  */
@@ -13,7 +13,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Store } from "./store.js";
-import type { Customer, Order, Referral } from "../../types/index.js";
+import type { Customer, Order } from "../../types/index.js";
 
 const tempDirs: string[] = [];
 
@@ -40,23 +40,16 @@ const SAMPLE_ORDER: Order = {
   gatewayRef: "MOCK-1",
   customerId: "9876543210",
   createdAt: new Date().toISOString(),
-  spinUsed: false,
 };
 
 describe("JSON-file persistence round-trip", () => {
-  it("recovers orders, wallets, referrals, and customers from a fresh Store over the same file", () => {
+  it("recovers orders, wallets, and customers from a fresh Store over the same file", () => {
     const dataFile = tempDataFile();
 
     // First Store: persist a variety of runtime state.
     const store = new Store(undefined, { persist: true, dataFile });
     store.saveOrder(SAMPLE_ORDER);
     store.saveWallet({ customerId: "9876543210", foodCoins: 42 });
-    const referral: Referral = {
-      customerId: "9876543210",
-      link: "https://bytebites.app/join?ref=9876543210",
-      creditedReferredIds: ["8887776665"],
-    };
-    store.saveReferral(referral);
     const customer: Customer = { mobile: "9876543210", name: "Asha" };
     store.saveCustomer(customer);
 
@@ -67,7 +60,6 @@ describe("JSON-file persistence round-trip", () => {
 
     expect(reloaded.getOrder("T-persist-1")).toEqual(SAMPLE_ORDER);
     expect(reloaded.getWallet("9876543210").foodCoins).toBe(42);
-    expect(reloaded.getReferral("9876543210")).toEqual(referral);
     expect(reloaded.getCustomer("9876543210")).toEqual(customer);
   });
 
@@ -84,9 +76,6 @@ describe("JSON-file persistence round-trip", () => {
       availableQuantity: 10,
       price: 50,
       stallId: "stall-tandoori",
-      spice: "mild",
-      flavor: "sweet",
-      portion: "light",
     });
     store.setAvailableQuantity(item.id, 3);
 

@@ -21,10 +21,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
+  Coupon,
   Customer,
   FoodItem,
   Order,
-  Referral,
   Wallet,
 } from "../../types/index.js";
 
@@ -36,8 +36,8 @@ import type {
 export interface StoreSnapshot {
   orders: Order[];
   wallets: Wallet[];
-  referrals: Referral[];
   customers: Customer[];
+  coupons?: Coupon[];
   /** Overridden available quantities keyed by itemId (post-seed mutations). */
   itemQuantities: Record<string, number>;
   /** Overridden prices (INR) keyed by itemId (post-seed admin edits). */
@@ -61,8 +61,8 @@ export function emptySnapshot(): StoreSnapshot {
   return {
     orders: [],
     wallets: [],
-    referrals: [],
     customers: [],
+    coupons: [],
     itemQuantities: {},
     itemPrices: {},
     customItems: [],
