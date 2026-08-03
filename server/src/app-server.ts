@@ -17,6 +17,7 @@
 
 import { createApp } from "./app.js";
 import { Store, DEFAULT_DATA_FILE, seedStalls, seedFoodItems } from "./store.js";
+import type { OrderRepo } from "./order-repo.js";
 import { MockGateway } from "./gateways/mock-gateway.js";
 import { PaytmGateway } from "./gateways/paytm-gateway.js";
 import { MockNotificationGateway } from "./notifications/mock-notification-gateway.js";
@@ -40,8 +41,15 @@ function resolveNotificationGateway(): NotificationGateway {
   return new MockNotificationGateway();
 }
 
-/** Build the Store with the configured persistence backend. */
-async function buildStore(): Promise<Store> {
+/**
+ * Build the Store and order repository for the configured backend.
+ *
+ * On the Prisma/Postgres backend, orders are owned by a direct-DB `OrderRepo`
+ * (not the in-memory snapshot), so they stay consistent across concurrent
+ * serverless instances. The JSON-file backend uses the default Store-backed
+ * repo (single-process dev).
+ */
+async function buildBackend(): Promise<{ store: Store; orderRepo?: OrderRepo }> {
   if (process.env.DATABASE_URL) {
     // Prisma is imported only when a database is configured, so the JSON-file
     // path never depends on the generated Prisma client.
@@ -58,26 +66,26 @@ async function buildStore(): Promise<Store> {
       console.log(`Seeded ${foodItems.length} food items into the catalogue table`);
     }
 
-    console.log("Persistence: Prisma/Postgres");
-    return new Store(
-      { stalls: seedStalls(), foodItems },
-      { persistence }
-    );
+    console.log("Persistence: Prisma/Postgres (orders via direct-DB repo)");
+    const store = new Store({ stalls: seedStalls(), foodItems }, { persistence });
+    return { store, orderRepo: persistence.createOrderRepo() };
   }
 
   console.log("Persistence: JSON file (set DATABASE_URL to use Postgres)");
-  return new Store(undefined, {
+  const store = new Store(undefined, {
     persist: true,
     dataFile: process.env.BYTEBITES_DATA_FILE ?? DEFAULT_DATA_FILE,
   });
+  return { store };
 }
 
-// Top-level await: build the store (loading any persisted snapshot) before the
-// app is exported, so the first request already sees restored state.
-const store = await buildStore();
+// Top-level await: build the backend (loading any persisted snapshot) before
+// the app is exported, so the first request already sees restored state.
+const { store, orderRepo } = await buildBackend();
 
 const app = createApp({
   store,
+  ...(orderRepo ? { orderRepo } : {}),
   paymentGateway: resolveGateway(),
   notificationGateway: resolveNotificationGateway(),
 });

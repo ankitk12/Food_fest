@@ -20,6 +20,7 @@ import {
   type PersistenceAdapter,
   type StoreSnapshot,
 } from "./persistence.js";
+import type { OrderRepo } from "./order-repo.js";
 import type {
   CartItem,
   FoodItem,
@@ -45,14 +46,15 @@ export class PrismaPersistence implements PersistenceAdapter {
    * `load()` can return the restored state.
    */
   async init(): Promise<void> {
-    const [customers, wallets, referrals, orders, itemStates] =
-      await Promise.all([
-        this.prisma.customer.findMany(),
-        this.prisma.wallet.findMany(),
-        this.prisma.referral.findMany(),
-        this.prisma.order.findMany(),
-        this.prisma.itemState.findMany(),
-      ]);
+    // NB: orders are intentionally NOT loaded into the snapshot. They are owned
+    // by `PrismaOrderRepo`, which reads/writes the Order table directly per
+    // request so orders stay consistent across concurrent serverless instances.
+    const [customers, wallets, referrals, itemStates] = await Promise.all([
+      this.prisma.customer.findMany(),
+      this.prisma.wallet.findMany(),
+      this.prisma.referral.findMany(),
+      this.prisma.itemState.findMany(),
+    ]);
 
     const snapshot: StoreSnapshot = {
       ...emptySnapshot(),
@@ -70,7 +72,7 @@ export class PrismaPersistence implements PersistenceAdapter {
         link: r.link,
         creditedReferredIds: r.creditedReferredIds,
       })),
-      orders: orders.map((o) => rowToOrder(o)),
+      // orders omitted on purpose — see note above (owned by PrismaOrderRepo).
       itemQuantities: Object.fromEntries(
         itemStates.map((i) => [i.itemId, i.quantity])
       ),
@@ -110,11 +112,12 @@ export class PrismaPersistence implements PersistenceAdapter {
     }));
 
     await this.prisma.$transaction([
-      // Clear everything first (no FK relations between these tables).
+      // Clear everything first (no FK relations between these tables). The
+      // Order table is deliberately excluded: orders are managed row-by-row by
+      // PrismaOrderRepo, so a snapshot write must never touch (or clobber) them.
       this.prisma.customer.deleteMany(),
       this.prisma.wallet.deleteMany(),
       this.prisma.referral.deleteMany(),
-      this.prisma.order.deleteMany(),
       this.prisma.itemState.deleteMany(),
       // Recreate from the current snapshot.
       this.prisma.customer.createMany({
@@ -137,7 +140,6 @@ export class PrismaPersistence implements PersistenceAdapter {
           creditedReferredIds: r.creditedReferredIds,
         })),
       }),
-      this.prisma.order.createMany({ data: s.orders.map((o) => orderToRow(o)) }),
       this.prisma.itemState.createMany({ data: itemStateData }),
       // Custom items are persisted into the FoodItem catalogue table itself, so
       // they are a first-class part of the catalogue on the next cold start.
@@ -175,10 +177,51 @@ export class PrismaPersistence implements PersistenceAdapter {
     await this.prisma.foodItem.createMany({ data: items.map((i) => ({ ...i })) });
   }
 
+  /**
+   * Build an order repository that reads/writes the Order table directly using
+   * this instance's Prisma client (shares the same connection/pool).
+   */
+  createOrderRepo(): OrderRepo {
+    return new PrismaOrderRepo(this.prisma);
+  }
+
   /** Flush any pending write and close the connection (graceful shutdown). */
   async disconnect(): Promise<void> {
     await this.writeChain;
     await this.prisma.$disconnect();
+  }
+}
+
+/**
+ * Direct, per-request Order table access. Unlike the snapshot persistence, this
+ * upserts/reads individual rows so orders placed on one serverless instance are
+ * immediately visible on another and are never clobbered by a snapshot write.
+ */
+export class PrismaOrderRepo implements OrderRepo {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async list(): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany();
+    return rows.map((o) => rowToOrder(o));
+  }
+
+  async get(token: string): Promise<Order | undefined> {
+    const row = await this.prisma.order.findUnique({ where: { token } });
+    return row ? rowToOrder(row) : undefined;
+  }
+
+  async save(order: Order): Promise<void> {
+    const data = orderToRow(order);
+    await this.prisma.order.upsert({
+      where: { token: order.token },
+      create: data,
+      update: data,
+    });
+  }
+
+  async usedTokens(): Promise<Set<string>> {
+    const rows = await this.prisma.order.findMany({ select: { token: true } });
+    return new Set(rows.map((r) => r.token));
   }
 }
 

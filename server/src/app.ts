@@ -23,6 +23,7 @@ import type {
   PaymentGateway,
 } from "../../types/index.js";
 import type { Store } from "./store.js";
+import { StoreOrderRepo, type OrderRepo } from "./order-repo.js";
 import { orderTotal } from "../../domain/pricing.js";
 import { coinsForOrder, applyRedemption } from "../../domain/foodcoins.js";
 import { issueToken } from "../../domain/tokens.js";
@@ -44,6 +45,12 @@ export interface AppDependencies {
    * kept for backwards compatibility with existing callers/tests.
    */
   paymentGateway?: PaymentGateway;
+  /**
+   * Order data access. Defaults to a Store-backed repo (in-memory / JSON
+   * backend). The Prisma/Postgres backend injects a repo that reads/writes the
+   * Order table directly so orders stay consistent across serverless instances.
+   */
+  orderRepo?: OrderRepo;
   /**
    * Notification gateway used to send an order confirmation after a successful
    * checkout. Injectable so tests use a deterministic mock; defaults to
@@ -86,6 +93,7 @@ export interface ApiError {
  */
 export function createApp(deps: AppDependencies): Express {
   const { store } = deps;
+  const orderRepo: OrderRepo = deps.orderRepo ?? new StoreOrderRepo(store);
   const notificationGateway =
     deps.notificationGateway ?? new MockNotificationGateway();
   const rng = deps.rng ?? Math.random;
@@ -339,7 +347,7 @@ export function createApp(deps: AppDependencies): Express {
       // Success: issue a unique token against the store's existing tokens,
       // create the order in "Craving Funded" state associated with the stall,
       // credit FoodCoins, and mark the spin available (Req 5.2, 5.4, 9.1).
-      const token = issueToken(store.getOrderTokens());
+      const token = issueToken(await orderRepo.usedTokens());
       const order: Order = {
         token,
         stallId,
@@ -358,7 +366,7 @@ export function createApp(deps: AppDependencies): Express {
         deliveryType: deliverToDesk ? "desk" : "stall",
         ...(deliverToDesk ? { deskLocation, floorNo } : {}),
       };
-      store.saveOrder(order);
+      await orderRepo.save(order);
 
       // Deduct ordered quantities from stock so availability updates in
       // real-time for other users browsing the marketplace.
@@ -424,9 +432,9 @@ export function createApp(deps: AppDependencies): Express {
   // tokens yield a 404 with the consistent `{ error, code }` shape.
   //
   // Validates: Requirements 6.3
-  app.get("/api/orders/:token", (req: Request, res: Response): void => {
+  app.get("/api/orders/:token", async (req: Request, res: Response): Promise<void> => {
     const { token } = req.params;
-    const order = store.getOrder(token);
+    const order = await orderRepo.get(token);
     if (!order) {
       const errBody: ApiError = {
         error: "Order not found",
@@ -447,9 +455,9 @@ export function createApp(deps: AppDependencies): Express {
   // Validates: Requirements 6.2, 6.3
   app.post(
     "/api/orders/:token/advance",
-    (req: Request, res: Response): void => {
+    async (req: Request, res: Response): Promise<void> => {
       const { token } = req.params;
-      const order = store.getOrder(token);
+      const order = await orderRepo.get(token);
       if (!order) {
         const errBody: ApiError = {
           error: "Order not found",
@@ -460,7 +468,7 @@ export function createApp(deps: AppDependencies): Express {
       }
 
       order.status = nextStatus(order.status);
-      store.saveOrder(order);
+      await orderRepo.save(order);
 
       res.status(200).json(order);
     }
@@ -477,9 +485,9 @@ export function createApp(deps: AppDependencies): Express {
   // production.
   app.post(
     "/api/orders/:token/mark-paid",
-    (req: Request, res: Response): void => {
+    async (req: Request, res: Response): Promise<void> => {
       const { token } = req.params;
-      const order = store.getOrder(token);
+      const order = await orderRepo.get(token);
       if (!order) {
         const errBody: ApiError = {
           error: "Order not found",
@@ -490,7 +498,7 @@ export function createApp(deps: AppDependencies): Express {
       }
 
       order.paid = true;
-      store.saveOrder(order);
+      await orderRepo.save(order);
 
       res.status(200).json(order);
     }
@@ -512,10 +520,9 @@ export function createApp(deps: AppDependencies): Express {
   // no orders.
   app.get(
     "/api/customers/:mobile/orders",
-    (req: Request, res: Response): void => {
+    async (req: Request, res: Response): Promise<void> => {
       const { mobile } = req.params;
-      const orders = store
-        .getOrders()
+      const orders = (await orderRepo.list())
         .filter((o) => o.customerId === mobile)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       res.status(200).json(orders);
@@ -528,11 +535,11 @@ export function createApp(deps: AppDependencies): Express {
   // Optionally filterable to a single stall via `?stallId=`. Each order is
   // enriched with the customer's registered name (looked up by the customerId
   // mobile) so the admin sees a name alongside the number.
-  app.get("/api/admin/orders", (req: Request, res: Response): void => {
+  app.get("/api/admin/orders", async (req: Request, res: Response): Promise<void> => {
     const stallId =
       typeof req.query.stallId === "string" ? req.query.stallId : undefined;
 
-    let orders = store.getOrders();
+    let orders = await orderRepo.list();
     if (stallId) {
       orders = orders.filter((o) => o.stallId === stallId);
     }
@@ -548,8 +555,8 @@ export function createApp(deps: AppDependencies): Express {
   // Fetch a single order by token for the admin view. Unknown tokens yield a
   // 404 with the consistent `{ error, code }` shape. (Same UNAUTHENTICATED
   // caveat as GET /api/admin/orders above.)
-  app.get("/api/admin/orders/:token", (req: Request, res: Response): void => {
-    const order = store.getOrder(req.params.token);
+  app.get("/api/admin/orders/:token", async (req: Request, res: Response): Promise<void> => {
+    const order = await orderRepo.get(req.params.token);
     if (!order) {
       const errBody: ApiError = {
         error: "Order not found",
@@ -944,8 +951,8 @@ export function createApp(deps: AppDependencies): Express {
   // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
   // for the festival demo and MUST be placed behind seller authentication in
   // production.
-  app.get("/api/admin/summary", (_req: Request, res: Response): void => {
-    const paidOrders = store.getOrders().filter((o) => o.paid);
+  app.get("/api/admin/summary", async (_req: Request, res: Response): Promise<void> => {
+    const paidOrders = (await orderRepo.list()).filter((o) => o.paid);
     const totalOrders = paidOrders.length;
     const totalCollection = paidOrders.reduce((sum, o) => sum + o.total, 0);
     const totalRewardPointsUsed = paidOrders.reduce(
@@ -1113,8 +1120,8 @@ export function createApp(deps: AppDependencies): Express {
   // ratings set is empty and the score is 0, consistent with the domain.
   //
   // Validates: Requirements 7.1
-  app.get("/api/metrics", (_req: Request, res: Response): void => {
-    const orders = store.getOrders();
+  app.get("/api/metrics", async (_req: Request, res: Response): Promise<void> => {
+    const orders = await orderRepo.list();
     const ratings = store.getFoodItems().map((item) => item.rating);
     res.status(200).json(computeMetrics(orders, ratings));
   });
@@ -1125,8 +1132,8 @@ export function createApp(deps: AppDependencies): Express {
   // today's paid orders in descending order of units).
   //
   // Validates: Requirements 11.1
-  app.get("/api/trending", (_req: Request, res: Response): void => {
-    res.status(200).json(rankTrending(store.getOrders()));
+  app.get("/api/trending", async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json(rankTrending(await orderRepo.list()));
   });
 
   // --- POST /api/ai-chef/recommend ----------------------------------------
@@ -1173,9 +1180,9 @@ export function createApp(deps: AppDependencies): Express {
   //     order via `spinReward`; the wallet balance is unaffected.
   //
   // Validates: Requirements 13.1, 13.3, 13.4
-  app.post("/api/orders/:token/spin", (req: Request, res: Response): void => {
+  app.post("/api/orders/:token/spin", async (req: Request, res: Response): Promise<void> => {
     const { token } = req.params;
-    const order = store.getOrder(token);
+    const order = await orderRepo.get(token);
     if (!order) {
       const errBody: ApiError = {
         error: "Order not found",
@@ -1215,7 +1222,7 @@ export function createApp(deps: AppDependencies): Express {
 
     order.spinUsed = true;
     order.spinReward = reward;
-    store.saveOrder(order);
+    await orderRepo.save(order);
 
     res.status(200).json({
       token: order.token,
