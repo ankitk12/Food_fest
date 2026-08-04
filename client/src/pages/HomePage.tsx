@@ -96,9 +96,20 @@ export function HomePage(): JSX.Element {
               return (
                 <li key={combo.id}>
                   <article className="combo-card" data-testid={`combo-card-${combo.id}`}>
-                    {combo.imageUrl && (
-                      <img className="combo-card-image" src={combo.imageUrl} alt={combo.name} />
-                    )}
+                    <div
+                      className="combo-card-images"
+                      data-count={Math.min(comboItems.length, 4)}
+                    >
+                      {comboItems.slice(0, 4).map((ci) => (
+                        <img
+                          key={ci.id}
+                          className="combo-card-thumb"
+                          src={ci.imageUrl}
+                          alt={ci.name}
+                          loading="lazy"
+                        />
+                      ))}
+                    </div>
                     <div className="combo-card-body">
                       <h3 className="combo-card-name">{combo.name}</h3>
                       <p className="combo-card-items">

@@ -837,7 +837,6 @@ function ComboPanel({ items }: ComboPanelProps): JSX.Element {
   const [name, setName] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [price, setPrice] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -887,12 +886,10 @@ function ComboPanel({ items }: ComboPanelProps): JSX.Element {
         name: name.trim(),
         itemIds: selectedIds,
         price: priceValue,
-        ...(imageUrl.trim() ? { imageUrl: imageUrl.trim() } : {}),
       });
       setName("");
       setSelectedIds([]);
       setPrice("");
-      setImageUrl("");
       await fetchCombos();
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create combo.");
@@ -940,16 +937,6 @@ function ComboPanel({ items }: ComboPanelProps): JSX.Element {
               onChange={(e) => setPrice(e.target.value)}
               data-testid="combo-price-input"
               required
-            />
-          </label>
-          <label className="admin-coupon-field">
-            <span>Image URL (optional)</span>
-            <input
-              type="url"
-              placeholder="https://…"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              data-testid="combo-image-input"
             />
           </label>
         </div>

@@ -794,10 +794,38 @@ main.home {
   border: 1px solid rgba(255, 157, 28, 0.45);
 }
 
-.combo-card-image {
+.combo-card-images {
+  display: grid;
   width: 100%;
-  height: 150px;
+  height: 160px;
+  gap: 2px;
+}
+
+/* A single item fills the whole banner; multiple items tile it. */
+.combo-card-images[data-count="1"] {
+  grid-template-columns: 1fr;
+}
+
+.combo-card-images[data-count="2"] {
+  grid-template-columns: 1fr 1fr;
+}
+
+.combo-card-images[data-count="3"],
+.combo-card-images[data-count="4"] {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+/* With 3 items, let the first image span the full left column height. */
+.combo-card-images[data-count="3"] .combo-card-thumb:first-child {
+  grid-row: span 2;
+}
+
+.combo-card-thumb {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+  min-height: 0;
 }
 
 .combo-card-body {
