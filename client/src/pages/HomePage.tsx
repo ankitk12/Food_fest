@@ -50,15 +50,16 @@ export function HomePage(): JSX.Element {
     [menuItems]
   );
 
-  // Only show combos whose clubbed items all still exist and are in stock.
-  const availableCombos = (combos ?? []).filter(
-    (combo) =>
-      combo.itemIds.length > 0 &&
-      combo.itemIds.every((id) => {
-        const it = itemsById.get(id);
-        return it && it.availableQuantity > 0;
-      })
-  );
+  const availableCombos = (combos ?? [])
+    .filter(
+      (combo) =>
+        combo.itemIds.length > 0 &&
+        combo.itemIds.every((id) => {
+          const it = itemsById.get(id);
+          return it && it.availableQuantity > 0;
+        })
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // Ticker items mirror the live menu: each catalogue item shows its name and
   // current price in the scrolling marquee (empty until the menu loads).

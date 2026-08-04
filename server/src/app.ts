@@ -1310,14 +1310,19 @@ export function createApp(deps: AppDependencies): Express {
   // show combo bundles to customers.
   app.get("/api/combos", async (_req: Request, res: Response): Promise<void> => {
     const combos = await comboRepo.list();
-    res.status(200).json(combos.filter((c) => c.active));
+    const sortedActive = combos
+      .filter((c) => c.active)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    res.status(200).json(sortedActive);
   });
 
   // --- GET /api/admin/combos ----------------------------------------------
   //
   // Returns all combos (active + inactive) for the admin panel.
   app.get("/api/admin/combos", async (_req: Request, res: Response): Promise<void> => {
-    res.status(200).json(await comboRepo.list());
+    const combos = await comboRepo.list();
+    const sortedAll = combos.sort((a, b) => a.name.localeCompare(b.name));
+    res.status(200).json(sortedAll);
   });
 
   // --- POST /api/admin/combos ---------------------------------------------

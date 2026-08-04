@@ -848,7 +848,8 @@ function ComboPanel({ items }: ComboPanelProps): JSX.Element {
 
   async function fetchCombos(): Promise<void> {
     try {
-      setCombos(await getAdminCombos());
+      const fetched = await getAdminCombos();
+      setCombos(fetched.sort((a, b) => a.name.localeCompare(b.name)));
     } catch {
       setError("Failed to load combos.");
     } finally {
