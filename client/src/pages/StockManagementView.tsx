@@ -26,14 +26,14 @@ import {
 import type { Combo, Coupon, FoodItem } from "../../../types/index.js";
 import { useCustomer } from "../customer/CustomerContext.js";
 import { usePolling } from "../hooks/usePolling.js";
-import { ADMIN_MOBILE } from "../constants.js";
+import { ADMIN_MOBILES } from "../constants.js";
 import { ROUTES } from "../routes.js";
 import { formatINR } from "../format.js";
 
 export function StockManagementView(): JSX.Element {
   const { customer } = useCustomer();
 
-  if (!customer || customer.mobile !== ADMIN_MOBILE) {
+  if (!customer || !ADMIN_MOBILES.includes(customer.mobile)) {
     return (
       <main className="admin">
         <h1>Access Denied</h1>

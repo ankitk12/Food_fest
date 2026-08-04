@@ -62,6 +62,7 @@ export class ApiClientError extends Error {
 export interface CheckoutRequest {
   stallId: string;
   customerId: string;
+  customerName?: string;
   items: CartItem[];
   /** Number of reward points to redeem (optional). 2 points = ₹1 discount. */
   redeemPoints?: number;
@@ -128,7 +129,7 @@ export interface OrderResponse {
   pickupTime?: string;
 }
 
-export interface RedeemResponse extends Wallet {}
+export interface RedeemResponse extends Wallet { }
 
 // --- Core request helper ---------------------------------------------------
 

@@ -30,7 +30,7 @@ export interface OrderRepo {
 
 /** Order repo backed by the in-memory Store (dev / tests / JSON backend). */
 export class StoreOrderRepo implements OrderRepo {
-  constructor(private readonly store: Store) {}
+  constructor(private readonly store: Store) { }
 
   async list(): Promise<Order[]> {
     return this.store.getOrders();

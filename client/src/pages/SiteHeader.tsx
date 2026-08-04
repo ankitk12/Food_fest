@@ -10,14 +10,14 @@ import { Link, NavLink } from "react-router-dom";
 import { ROUTES, walletPath } from "../routes.js";
 import { useCart } from "../cart/CartContext.js";
 import { useCustomer } from "../customer/CustomerContext.js";
-import { ADMIN_MOBILE } from "../constants.js";
+import { ADMIN_MOBILES } from "../constants.js";
 
 export function SiteHeader(): JSX.Element {
   const { cart } = useCart();
   const { customer } = useCustomer();
   const count = cart.reduce((sum, line) => sum + line.quantity, 0);
   const walletTarget = customer ? walletPath(customer.mobile) : ROUTES.profile;
-  const isAdmin = customer?.mobile === ADMIN_MOBILE;
+  const isAdmin = customer?.mobile ? ADMIN_MOBILES.includes(customer.mobile) : false;
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Close sidebar on navigation

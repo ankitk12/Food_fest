@@ -25,6 +25,7 @@ import { ROUTES } from "../routes.js";
 import { formatINR } from "../format.js";
 import { DEMO_STALL_ID } from "../demo.js";
 import { CustomerForm } from "./ProfileView.js";
+import { ADMIN_MOBILES } from "../constants.js";
 
 type CheckoutState =
   | { status: "idle" }
@@ -153,6 +154,10 @@ export function CheckoutView(): JSX.Element {
   // Preferred time to collect / receive the order.
   const [pickupTime, setPickupTime] = useState("");
 
+  const isAdmin = Boolean(customer && ADMIN_MOBILES.includes(customer.mobile));
+  const [adminCustomerMobile, setAdminCustomerMobile] = useState("");
+  const [adminCustomerName, setAdminCustomerName] = useState("");
+
   useEffect(() => {
     getConfig()
       .then((cfg) => {
@@ -225,11 +230,15 @@ export function CheckoutView(): JSX.Element {
   async function handlePay(method: "UPI" | "cash"): Promise<void> {
     if (!customer || !deliveryValid) return;
     const stallId = DEMO_STALL_ID;
+    const finalCustomerId = isAdmin && adminCustomerMobile.trim() ? adminCustomerMobile.trim() : customer.mobile;
+    const finalCustomerName = isAdmin && adminCustomerName.trim() ? adminCustomerName.trim() : undefined;
+
     setState({ status: "paying" });
     try {
       const result = await checkout({
         stallId,
-        customerId: customer.mobile,
+        customerId: finalCustomerId,
+        ...(finalCustomerName ? { customerName: finalCustomerName } : {}),
         items: toCartItems(cart),
         paymentMethod: method,
         deliveryType,
@@ -288,11 +297,14 @@ export function CheckoutView(): JSX.Element {
       return;
     }
 
+    const finalCustomerId = isAdmin && adminCustomerMobile.trim() ? adminCustomerMobile.trim() : customer.mobile;
+    const finalCustomerName = isAdmin && adminCustomerName.trim() ? adminCustomerName.trim() : undefined;
+
     setState({ status: "paying" });
     try {
       const rzpOrder = await createRazorpayOrder({
         amount: amountPaise,
-        receipt: `${customer.mobile}-${Date.now()}`,
+        receipt: `${finalCustomerId}-${Date.now()}`,
       });
 
       const options: RazorpayOptions = {
@@ -302,7 +314,7 @@ export function CheckoutView(): JSX.Element {
         name: merchant.name,
         description: "Invest-A-Bite order",
         order_id: rzpOrder.orderId,
-        prefill: { name: customer.name, contact: customer.mobile },
+        prefill: { name: finalCustomerName || customer.name, contact: finalCustomerId },
         theme: { color: "#ff9d1c" },
         handler: (resp: RazorpaySuccess) => {
           void (async () => {
@@ -320,7 +332,8 @@ export function CheckoutView(): JSX.Element {
               }
               const result = await checkout({
                 stallId: DEMO_STALL_ID,
-                customerId: customer.mobile,
+                customerId: finalCustomerId,
+                ...(finalCustomerName ? { customerName: finalCustomerName } : {}),
                 items: toCartItems(cart),
                 paymentMethod: "UPI",
                 deliveryType,
@@ -490,7 +503,7 @@ export function CheckoutView(): JSX.Element {
                   onClick={() => handleSelectCoupon(c)}
                   data-testid={`coupon-card-${c.code}`}
                 >
-                  <span className="checkout-coupon-badge">{c.discountPercent}%<br/>OFF</span>
+                  <span className="checkout-coupon-badge">{c.discountPercent}%<br />OFF</span>
                   <span className="checkout-coupon-body">
                     <span className="checkout-coupon-code">{c.code}</span>
                     <span className="checkout-coupon-desc">
@@ -554,9 +567,36 @@ export function CheckoutView(): JSX.Element {
         </p>
       </div>
 
-      <p className="checkout-customer" data-testid="checkout-customer">
-        Ordering as {customer.name || customer.mobile} ({customer.mobile}).
-      </p>
+      {isAdmin ? (
+        <fieldset className="checkout-admin-override" style={{ marginBottom: '24px', padding: '16px', border: '1px solid #ff9d1c', borderRadius: '12px', background: 'rgba(255, 157, 28, 0.05)' }}>
+          <legend style={{ fontWeight: '600', color: '#ff9d1c', padding: '0 8px' }}>Admin Override (Optional)</legend>
+          <p style={{ margin: '0 0 16px', fontSize: '0.9rem', opacity: 0.8 }}>
+            Ordering on behalf of a customer? Enter their details below to place the order in their name.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <input
+              type="tel"
+              className="customer-form-input"
+              placeholder="Customer Mobile Number"
+              value={adminCustomerMobile}
+              onChange={(e) => setAdminCustomerMobile(e.target.value)}
+              style={{ flex: '1 1 200px' }}
+            />
+            <input
+              type="text"
+              className="customer-form-input"
+              placeholder="Customer Name"
+              value={adminCustomerName}
+              onChange={(e) => setAdminCustomerName(e.target.value)}
+              style={{ flex: '1 1 200px' }}
+            />
+          </div>
+        </fieldset>
+      ) : (
+        <p className="checkout-customer" data-testid="checkout-customer">
+          Ordering as {customer.name || customer.mobile} ({customer.mobile}).
+        </p>
+      )}
 
       <fieldset className="checkout-delivery" data-testid="checkout-delivery">
         <legend>How would you like to receive your order?</legend>

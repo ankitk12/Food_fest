@@ -7,7 +7,7 @@
  *   - Completed: status "Happiness Disbursed"
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   advanceOrder,
@@ -23,7 +23,7 @@ import { ORDER_STATUS_SEQUENCE } from "../../../types/index.js";
 import type { OrderStatus, FoodItem, CartItem } from "../../../types/index.js";
 import { usePolling } from "../hooks/usePolling.js";
 import { useCustomer } from "../customer/CustomerContext.js";
-import { ADMIN_MOBILE } from "../constants.js";
+import { ADMIN_MOBILES } from "../constants.js";
 import { ROUTES } from "../routes.js";
 import { formatINR } from "../format.js";
 import { isValidMobile } from "../../../domain/mobile.js";
@@ -69,7 +69,7 @@ function formatCreatedAt(iso: string): string {
 export function AdminOrdersView(): JSX.Element {
   const { customer } = useCustomer();
 
-  if (!customer || customer.mobile !== ADMIN_MOBILE) {
+  if (!customer || !ADMIN_MOBILES.includes(customer.mobile)) {
     return (
       <main className="admin">
         <h1>Access Denied</h1>
@@ -92,6 +92,8 @@ function AdminOrdersPanel(): JSX.Element {
   const [advancingToken, setAdvancingToken] = useState<string | null>(null);
   const [advanceError, setAdvanceError] = useState<string | undefined>(undefined);
   const [markingToken, setMarkingToken] = useState<string | null>(null);
+  const [search, setSearch] = useState<string>(''); // search query for customer name or mobile
+  const [showScheduledOnly, setShowScheduledOnly] = useState<boolean>(false);
 
   const handleMarkPaid = useCallback(
     async (token: string): Promise<void> => {
@@ -125,13 +127,27 @@ function AdminOrdersPanel(): JSX.Element {
   );
 
   const orders = data ?? [];
+  const filteredOrders = useMemo(() => {
+    if (!search.trim() && !showScheduledOnly) return orders;
+    const lower = search.toLowerCase();
+    const now = new Date();
+    return orders.filter(o => {
+      const matchesSearch =
+        (!search.trim()) ||
+        (o.customerName && o.customerName.toLowerCase().includes(lower)) ||
+        (o.customerId && o.customerId.includes(search));
+      const matchesSchedule =
+        !showScheduledOnly || (o.pickupTime);
+      return matchesSearch && matchesSchedule;
+    });
+  }, [orders, search, showScheduledOnly]);
 
   // Filter orders by tab
-  const newOrders = orders.filter((o) => o.status === "Craving Funded");
-  const processingOrders = orders.filter(
+  const newOrders = filteredOrders.filter((o) => o.status === "Craving Funded");
+  const processingOrders = filteredOrders.filter(
     (o) => o.status === "Flavor Processing" || o.status === "Taste Ready for Pickup"
   );
-  const completedOrders = orders.filter((o) => o.status === "Happiness Disbursed");
+  const completedOrders = filteredOrders.filter((o) => o.status === "Happiness Disbursed");
 
   const displayedOrders =
     activeTab === "new"
@@ -147,6 +163,25 @@ function AdminOrdersPanel(): JSX.Element {
         <p className="admin-note" data-testid="admin-note">
           Staff view — order and payment actions are unauthenticated in this demo.
         </p>
+        <div className="admin-search">
+          <input
+            type="text"
+            placeholder="Search by name or mobile"
+            className="admin-search-input"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            data-testid="admin-search"
+          />
+          <label className="admin-schedule-filter">
+            <input
+              type="checkbox"
+              checked={showScheduledOnly}
+              onChange={e => setShowScheduledOnly(e.target.checked)}
+              data-testid="admin-schedule-filter-checkbox"
+            />
+            Show scheduled only
+          </label>
+        </div>
       </header>
 
       {/* Sub-tabs */}
@@ -246,11 +281,13 @@ function AdminOrdersPanel(): JSX.Element {
                   data-testid={`admin-delivery-${order.token}`}
                 >
                   {order.deliveryType === "desk"
-                    ? `🛎️ Desk delivery — ${
-                        order.floorNo ? `Floor ${order.floorNo}` : ""
-                      }, ${order.deskLocation ?? ""}`
+                    ? `🛎️ Desk delivery — ${order.floorNo ? `Floor ${order.floorNo}` : ""
+                    }, ${order.deskLocation ?? ""}`
                     : "🏪 Collect at stall"}
                   {order.pickupTime ? ` · ⏰ ${order.pickupTime}` : ""}
+                  {order.pickupTime && (
+                    <span className="admin-scheduled-badge" data-testid={`admin-scheduled-${order.token}`}>Scheduled</span>
+                  )}
                 </div>
 
                 <div className="admin-order-card-items">
@@ -262,16 +299,14 @@ function AdminOrdersPanel(): JSX.Element {
                   data-testid={`admin-payment-${order.token}`}
                 >
                   <span
-                    className={`admin-pay-method admin-pay-method--${
-                      order.paymentMethod === "cash" ? "cash" : "upi"
-                    }`}
+                    className={`admin-pay-method admin-pay-method--${order.paymentMethod === "cash" ? "cash" : "upi"
+                      }`}
                   >
                     {order.paymentMethod === "cash" ? "💵 Cash" : "📱 UPI"}
                   </span>
                   <span
-                    className={`admin-pay-status admin-pay-status--${
-                      order.paid ? "received" : "pending"
-                    }`}
+                    className={`admin-pay-status admin-pay-status--${order.paid ? "received" : "pending"
+                      }`}
                   >
                     {order.paid ? "Received" : "Pending"}
                   </span>

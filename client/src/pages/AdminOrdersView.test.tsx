@@ -12,7 +12,7 @@ import { MemoryRouter } from "react-router-dom";
 import * as api from "../api/client.js";
 import type { OrderResponse } from "../api/client.js";
 import { CustomerProvider, CUSTOMER_STORAGE_KEY } from "../customer/CustomerContext.js";
-import { ADMIN_MOBILE } from "../constants.js";
+import { ADMIN_MOBILES } from "../constants.js";
 import { AdminOrdersView } from "./AdminOrdersView.js";
 
 vi.mock("../api/client.js", async () => {
@@ -56,7 +56,7 @@ beforeEach(() => {
   // Set admin identity so the view is accessible.
   window.localStorage.setItem(
     CUSTOMER_STORAGE_KEY,
-    JSON.stringify({ mobile: ADMIN_MOBILE, name: "Admin" })
+    JSON.stringify({ mobile: ADMIN_MOBILES[0] ?? "9512311001", name: "Admin" })
   );
 });
 

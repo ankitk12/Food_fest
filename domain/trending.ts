@@ -44,13 +44,17 @@ export function rankTrending(orders: PaidOrder[]): TrendingEntry[] {
     if (!order.paid) continue;
 
     for (const item of order.items) {
+      // If this is a combo, include the names of the component items in the display.
+      const displayName = item.comboItemNames && item.comboItemNames.length > 0
+        ? `${item.name} (${item.comboItemNames.join(', ')})`
+        : item.name;
       const existing = counts.get(item.itemId);
       if (existing) {
         existing.unitsOrdered += item.quantity;
       } else {
         counts.set(item.itemId, {
           itemId: item.itemId,
-          name: item.name,
+          name: displayName,
           unitsOrdered: item.quantity,
         });
       }

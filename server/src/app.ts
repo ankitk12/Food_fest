@@ -430,6 +430,7 @@ export function createApp(deps: AppDependencies): Express {
       const body = (req.body ?? {}) as {
         stallId?: unknown;
         customerId?: unknown;
+        customerName?: unknown;
         items?: unknown;
         redeemPoints?: unknown;
         paymentMethod?: unknown;
@@ -474,6 +475,8 @@ export function createApp(deps: AppDependencies): Express {
       const customerId = isValidMobile(rawCustomerId)
         ? normalizeMobile(rawCustomerId)
         : rawCustomerId.trim();
+      const customerName =
+        typeof body.customerName === "string" ? body.customerName.trim() : "";
 
       // Reject an empty cart before contacting the gateway (Req 5.1 guard).
       if (items.length === 0) {
@@ -598,11 +601,11 @@ export function createApp(deps: AppDependencies): Express {
         paymentMethod: payWithCash ? "cash" : "UPI",
         ...(hasGatewayProof
           ? {
-              gatewayRef: rzpPaymentId,
-              razorpayOrderId: rzpOrderId,
-              razorpayPaymentId: rzpPaymentId,
-              razorpaySignature: rzpSignature,
-            }
+            gatewayRef: rzpPaymentId,
+            razorpayOrderId: rzpOrderId,
+            razorpayPaymentId: rzpPaymentId,
+            razorpaySignature: rzpSignature,
+          }
           : {}),
         customerId,
         createdAt: new Date().toISOString(),
@@ -643,11 +646,14 @@ export function createApp(deps: AppDependencies): Express {
       // Auto-create a minimal customer for a checkout by an unregistered mobile
       // so the identity exists for later lookups (checkout does not require a
       // prior registration). Existing customers are left untouched.
-      if (
-        isValidMobile(customerId) &&
-        !(await customerRepo.get(customerId))
-      ) {
-        await customerRepo.save({ mobile: customerId, name: "" });
+      if (isValidMobile(customerId)) {
+        const existingCustomer = await customerRepo.get(customerId);
+        if (!existingCustomer) {
+          await customerRepo.save({ mobile: customerId, name: customerName });
+        } else if (customerName && existingCustomer.name !== customerName) {
+          // If admin provided a name and it differs, we could update it
+          await customerRepo.save({ ...existingCustomer, name: customerName });
+        }
       }
 
       res.status(201).json({
@@ -887,16 +893,16 @@ export function createApp(deps: AppDependencies): Express {
 
     const rating =
       typeof body.rating === "number" &&
-      Number.isFinite(body.rating) &&
-      body.rating >= 0 &&
-      body.rating <= 5
+        Number.isFinite(body.rating) &&
+        body.rating >= 0 &&
+        body.rating <= 5
         ? body.rating
         : 4.5;
 
     const cheesePrice =
       typeof body.cheesePrice === "number" &&
-      Number.isFinite(body.cheesePrice) &&
-      body.cheesePrice > 0
+        Number.isFinite(body.cheesePrice) &&
+        body.cheesePrice > 0
         ? body.cheesePrice
         : 0;
 
@@ -911,7 +917,7 @@ export function createApp(deps: AppDependencies): Express {
       cheesePrice,
       jainAvailable: body.jainAvailable === true,
       ...(typeof body.displayOrder === "number" &&
-      Number.isFinite(body.displayOrder)
+        Number.isFinite(body.displayOrder)
         ? { displayOrder: Math.floor(body.displayOrder) }
         : {}),
     });
