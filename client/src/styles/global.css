@@ -1317,9 +1317,9 @@ main.home {
 
 /* --- cheese add-on toggle on food cards --- */
 .food-card-addon {
-  display: inline-flex;
-  align-self: flex-start;
-  width: fit-content;
+  display: flex;
+  width: 100%;
+  justify-content: flex-start;
   align-items: center;
   gap: 0.4rem;
   font-size: 0.85rem;
@@ -1327,7 +1327,8 @@ main.home {
   color: var(--ia-text);
   cursor: pointer;
   padding: 0.3rem 0.7rem;
-  margin: 0.15rem 0.4rem 0.35rem 0;
+  margin: 0.15rem 0 0.5rem 0;
+  box-sizing: border-box;
   border: 1px solid var(--ia-border);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
