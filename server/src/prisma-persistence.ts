@@ -71,6 +71,14 @@ export class PrismaPersistence implements PersistenceAdapter {
 
   save(snapshot: StoreSnapshot): void {
     this.latest = snapshot;
+    // Write-through on a serialized chain so the last write always wins and a
+    // transient DB error is logged rather than failing the request. Orders are
+    // NOT part of this snapshot — they're persisted directly by PrismaOrderRepo.
+    this.writeChain = this.writeChain
+      .then(() => this.persistAll(snapshot))
+      .catch((err: unknown) => {
+        console.error("Failed to persist state to Postgres:", err);
+      });
   }
 
   /** Upsert all snapshot items into PostgreSQL atomically without deleting tables. */
