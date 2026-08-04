@@ -94,7 +94,7 @@ export function createApp(deps: AppDependencies): Express {
   // (Requirement 4.3).
   app.get(
     "/api/stalls/:stallId/menu",
-    (req: Request, res: Response): void => {
+    async (req: Request, res: Response): Promise<void> => {
       const { stallId } = req.params;
 
       if (!store.hasStall(stallId)) {
@@ -106,16 +106,20 @@ export function createApp(deps: AppDependencies): Express {
         return;
       }
 
-      res.status(200).json(store.getMenu(stallId));
+      // Read the live catalogue/stock directly from the database.
+      const menu = (await foodItemRepo.list()).filter(
+        (item) => item.stallId === stallId
+      );
+      res.status(200).json(menu);
     }
   );
 
   // --- GET /api/menu ------------------------------------------------------
   //
   // Returns ALL food items across ALL stalls. Used by the marketplace to
-  // display the full catalogue to users.
-  app.get("/api/menu", (_req: Request, res: Response): void => {
-    res.status(200).json(store.getFoodItems());
+  // display the full catalogue to users. Reads live stock directly from the DB.
+  app.get("/api/menu", async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json(await foodItemRepo.list());
   });
 
   // --- GET /api/config ----------------------------------------------------
@@ -275,7 +279,7 @@ export function createApp(deps: AppDependencies): Express {
       // available stock. This prevents orders for items the admin has marked
       // out of stock, even if the user's client hasn't refreshed yet.
       for (const cartItem of items) {
-        const foodItem = store.getFoodItem(cartItem.itemId);
+        const foodItem = await foodItemRepo.get(cartItem.itemId);
         if (foodItem && foodItem.availableQuantity < cartItem.quantity) {
           const errBody: ApiError = {
             error:
@@ -361,14 +365,6 @@ export function createApp(deps: AppDependencies): Express {
           await foodItemRepo.updateStock(
             cartItem.itemId,
             Math.max(0, currentItem.availableQuantity - cartItem.quantity)
-          );
-        }
-
-        const currentItem1 = store.getFoodItem(cartItem.itemId);
-        if (currentItem1) {
-          store.setAvailableQuantity(
-            cartItem.itemId,
-            currentItem1.availableQuantity - cartItem.quantity
           );
         }
       }
@@ -543,9 +539,10 @@ export function createApp(deps: AppDependencies): Express {
 
   // --- GET /api/admin/items -----------------------------------------------
   //
-  // Lists all food items across all stalls for stock management.
-  app.get("/api/admin/items", (_req: Request, res: Response): void => {
-    res.status(200).json(store.getFoodItems());
+  // Lists all food items across all stalls for stock management. Reads the
+  // live catalogue and stock levels directly from the database.
+  app.get("/api/admin/items", async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json(await foodItemRepo.list());
   });
 
   // --- POST /api/admin/items ----------------------------------------------
@@ -1079,7 +1076,7 @@ export function createApp(deps: AppDependencies): Express {
   // Validates: Requirements 7.1
   app.get("/api/metrics", async (_req: Request, res: Response): Promise<void> => {
     const orders = await orderRepo.list();
-    const ratings = store.getFoodItems().map((item) => item.rating);
+    const ratings = (await foodItemRepo.list()).map((item) => item.rating);
     res.status(200).json(computeMetrics(orders, ratings));
   });
 

@@ -102,7 +102,7 @@ export function FoodItemCard({
         {unavailable ? (
           <span className="food-card-unavailable-label">Unavailable</span>
         ) : (
-          <span>{item.availableQuantity} available</span>
+          ''
         )}
       </p>
 

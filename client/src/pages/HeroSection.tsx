@@ -1,8 +1,11 @@
-import type { FoodItem } from "../../../types/index.js";
+import type { Coupon, FoodItem } from "../../../types/index.js";
+import { formatINR } from "../format.js";
 
 export interface HeroSectionProps {
   /** Array of catalogue food items to compute lowest/highest price dynamically */
   items?: FoodItem[];
+  /** Active coupons to advertise as available offers in the hero. */
+  offers?: Coupon[];
   /** Optional explicit minimum price override */
   minPrice?: number;
   /** Optional explicit maximum price override */
@@ -17,6 +20,7 @@ export interface HeroSectionProps {
  */
 export function HeroSection({
   items,
+  offers = [],
   minPrice: propMinPrice,
   maxPrice: propMaxPrice,
 }: HeroSectionProps = {}): JSX.Element {
@@ -224,6 +228,36 @@ export function HeroSection({
           ▲ Market open
         </p>
       </div>
+
+      {/* Available offers (active coupons) — floating panel on the right */}
+      {offers.length > 0 && (
+        <aside className="hero-offers-panel" data-testid="hero-offers" aria-label="Available offers">
+          <span className="hero-offers-title">
+            <span aria-hidden="true">🎉</span> Today&apos;s Offers
+          </span>
+          <div className="hero-offers-stack">
+            {offers.map((c) => (
+              <div
+                key={c.code}
+                className="hero-offer-ticket"
+                data-testid={`hero-offer-${c.code}`}
+              >
+                <div className="hero-offer-ticket-left">
+                  <span className="hero-offer-percent">{c.discountPercent}%</span>
+                  <span className="hero-offer-off">OFF</span>
+                </div>
+                <div className="hero-offer-ticket-right">
+                  <span className="hero-offer-code">{c.code}</span>
+                  <span className="hero-offer-min">
+                    on orders above {formatINR(c.minOrderValue)}
+                  </span>
+                  <span className="hero-offer-apply">Tap code at checkout</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+      )}
     </section>
   );
 }

@@ -16,8 +16,8 @@ import { useScrollReveal } from "../hooks/useScrollReveal.js";
 import { HeroSection } from "./HeroSection.js";
 import { TickerMarquee } from "./TickerMarquee.js";
 import type { TickerItem } from "./TickerMarquee.js";
-import type { FoodItem } from "../../../types/index.js";
-import { getAllItems } from "../api/client.js";
+import type { Coupon, FoodItem } from "../../../types/index.js";
+import { getAllItems, getCoupons } from "../api/client.js";
 import { ROUTES } from "../routes.js";
 import { useCart } from "../cart/CartContext.js";
 import { usePolling } from "../hooks/usePolling.js";
@@ -33,6 +33,11 @@ export function HomePage(): JSX.Element {
 
   const fetchMenu = useCallback(() => getAllItems(), []);
   const { data: items, error, loading } = usePolling<FoodItem[]>(fetchMenu);
+
+  // Available offers (active coupons) shown to the customer before ordering.
+  const fetchCoupons = useCallback(() => getCoupons(), []);
+  const { data: coupons } = usePolling<Coupon[]>(fetchCoupons);
+  const offers = (coupons ?? []).filter((c) => c.active);
 
   const menuItems = items ?? [];
 
@@ -50,7 +55,7 @@ export function HomePage(): JSX.Element {
 
   return (
     <main className="home" ref={containerRef}>
-      <HeroSection items={menuItems} />
+      <HeroSection items={menuItems} offers={offers} />
       <TickerMarquee items={tickerItems} />
 
       <section className="home-order" style={{ padding: "48px 6vw 96px" }}>
@@ -60,6 +65,8 @@ export function HomePage(): JSX.Element {
             Fresh off the board — add items straight to your cart.
           </p>
         </header>
+
+
 
         {/* <div className="reward-info-banner">
           <h3>🎁 Earn Rewards on Every Order!</h3>
