@@ -42,7 +42,6 @@ export function rankTrending(orders: PaidOrder[]): TrendingEntry[] {
 
   for (const order of orders) {
     if (!order.paid) continue;
-    if (!isToday(order.createdAt)) continue;
 
     for (const item of order.items) {
       const existing = counts.get(item.itemId);
