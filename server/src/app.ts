@@ -63,6 +63,20 @@ export interface ApiError {
 }
 
 /**
+ * Order the menu for display: items with an admin-set `displayOrder` come
+ * first (ascending), then items without one, each group broken alphabetically
+ * by name. Returns a new sorted array (does not mutate the input).
+ */
+function sortByDisplayOrder(items: FoodItem[]): FoodItem[] {
+  return [...items].sort((a, b) => {
+    const ao = a.displayOrder ?? Number.POSITIVE_INFINITY;
+    const bo = b.displayOrder ?? Number.POSITIVE_INFINITY;
+    if (ao !== bo) return ao - bo;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/**
  * Build a configured Express app around the provided store.
  * Each endpoint task registers its routes on the app created here.
  */
@@ -110,7 +124,7 @@ export function createApp(deps: AppDependencies): Express {
       const menu = (await foodItemRepo.list()).filter(
         (item) => item.stallId === stallId
       );
-      res.status(200).json(menu);
+      res.status(200).json(sortByDisplayOrder(menu));
     }
   );
 
@@ -119,7 +133,7 @@ export function createApp(deps: AppDependencies): Express {
   // Returns ALL food items across ALL stalls. Used by the marketplace to
   // display the full catalogue to users. Reads live stock directly from the DB.
   app.get("/api/menu", async (_req: Request, res: Response): Promise<void> => {
-    res.status(200).json(await foodItemRepo.list());
+    res.status(200).json(sortByDisplayOrder(await foodItemRepo.list()));
   });
 
   // --- GET /api/config ----------------------------------------------------
@@ -542,7 +556,7 @@ export function createApp(deps: AppDependencies): Express {
   // Lists all food items across all stalls for stock management. Reads the
   // live catalogue and stock levels directly from the database.
   app.get("/api/admin/items", async (_req: Request, res: Response): Promise<void> => {
-    res.status(200).json(await foodItemRepo.list());
+    res.status(200).json(sortByDisplayOrder(await foodItemRepo.list()));
   });
 
   // --- POST /api/admin/items ----------------------------------------------
@@ -566,6 +580,7 @@ export function createApp(deps: AppDependencies): Express {
       rating?: unknown;
       cheesePrice?: unknown;
       jainAvailable?: unknown;
+      displayOrder?: unknown;
       spice?: unknown;
       flavor?: unknown;
       portion?: unknown;
@@ -643,6 +658,10 @@ export function createApp(deps: AppDependencies): Express {
       stallId,
       cheesePrice,
       jainAvailable: body.jainAvailable === true,
+      ...(typeof body.displayOrder === "number" &&
+      Number.isFinite(body.displayOrder)
+        ? { displayOrder: Math.floor(body.displayOrder) }
+        : {}),
     });
 
     // Also write directly to the catalogue table (awaited) so the new item is
@@ -675,6 +694,7 @@ export function createApp(deps: AppDependencies): Express {
       rating?: unknown;
       cheesePrice?: unknown;
       jainAvailable?: unknown;
+      displayOrder?: unknown;
       spice?: unknown;
       flavor?: unknown;
       portion?: unknown;
@@ -771,6 +791,22 @@ export function createApp(deps: AppDependencies): Express {
 
     if (typeof body.jainAvailable === "boolean") {
       patch.jainAvailable = body.jainAvailable;
+    }
+
+    if (body.displayOrder !== undefined) {
+      if (
+        typeof body.displayOrder !== "number" ||
+        !Number.isFinite(body.displayOrder) ||
+        body.displayOrder < 0
+      ) {
+        const errBody: ApiError = {
+          error: "displayOrder must be a non-negative number",
+          code: "INVALID_ITEM",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      patch.displayOrder = Math.floor(body.displayOrder);
     }
 
     if (typeof body.description === "string") {

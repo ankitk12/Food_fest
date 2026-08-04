@@ -40,6 +40,12 @@ export interface FoodItem {
    * the admin. When true, the customer can request the Jain option (no charge).
    */
   jainAvailable?: boolean;
+  /**
+   * Optional sort position controlling where this item appears in the menu,
+   * configured per item by the admin. Lower values are shown first; items
+   * without a value sort after those that have one (then alphabetically).
+   */
+  displayOrder?: number;
 }
 
 export interface CartItem {

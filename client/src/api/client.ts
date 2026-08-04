@@ -231,6 +231,8 @@ export interface CreateItemRequest {
   cheesePrice?: number;
   /** Whether a Jain version of this item is available. */
   jainAvailable?: boolean;
+  /** Sort position in the menu (lower shows first). Omitted = unsorted. */
+  displayOrder?: number;
 }
 
 /** POST /api/admin/items — create a new food item; returns the created item. */

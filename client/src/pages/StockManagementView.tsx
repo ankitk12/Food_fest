@@ -162,6 +162,7 @@ function AddItemForm({ onCreated }: AddItemFormProps): JSX.Element {
   const [imageUrl, setImageUrl] = useState("");
   const [cheesePrice, setCheesePrice] = useState("");
   const [jainAvailable, setJainAvailable] = useState(false);
+  const [displayOrder, setDisplayOrder] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -182,6 +183,7 @@ function AddItemForm({ onCreated }: AddItemFormProps): JSX.Element {
     setImageUrl("");
     setCheesePrice("");
     setJainAvailable(false);
+    setDisplayOrder("");
   }
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
@@ -199,6 +201,9 @@ function AddItemForm({ onCreated }: AddItemFormProps): JSX.Element {
         imageUrl: imageUrl.trim() || undefined,
         cheesePrice: cheesePrice.trim() === "" ? 0 : Number(cheesePrice),
         jainAvailable,
+        ...(displayOrder.trim() === ""
+          ? {}
+          : { displayOrder: Number(displayOrder) }),
       };
       const created = await createItem(req);
       setSuccess(`Added “${created.name}”.`);
@@ -255,6 +260,8 @@ function AddItemForm({ onCreated }: AddItemFormProps): JSX.Element {
         setCheesePrice={setCheesePrice}
         jainAvailable={jainAvailable}
         setJainAvailable={setJainAvailable}
+        displayOrder={displayOrder}
+        setDisplayOrder={setDisplayOrder}
       />
 
       {error && (
@@ -309,6 +316,9 @@ function EditItemModal({ item, onClose, onSaved }: EditItemModalProps): JSX.Elem
     item.cheesePrice ? String(item.cheesePrice) : ""
   );
   const [jainAvailable, setJainAvailable] = useState(item.jainAvailable === true);
+  const [displayOrder, setDisplayOrder] = useState(
+    item.displayOrder != null ? String(item.displayOrder) : ""
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -334,6 +344,9 @@ function EditItemModal({ item, onClose, onSaved }: EditItemModalProps): JSX.Elem
         imageUrl,
         cheesePrice: cheesePrice.trim() === "" ? 0 : Number(cheesePrice),
         jainAvailable,
+        ...(displayOrder.trim() === ""
+          ? {}
+          : { displayOrder: Number(displayOrder) }),
       };
       await updateItem(item.id, patch);
       onSaved();
@@ -390,6 +403,8 @@ function EditItemModal({ item, onClose, onSaved }: EditItemModalProps): JSX.Elem
             setCheesePrice={setCheesePrice}
             jainAvailable={jainAvailable}
             setJainAvailable={setJainAvailable}
+            displayOrder={displayOrder}
+            setDisplayOrder={setDisplayOrder}
           />
 
           {error && (
@@ -439,6 +454,8 @@ interface ItemFieldsProps {
   setCheesePrice: (v: string) => void;
   jainAvailable: boolean;
   setJainAvailable: (v: boolean) => void;
+  displayOrder: string;
+  setDisplayOrder: (v: string) => void;
 }
 
 /** Shared field grid used by both the add and edit item forms. */
@@ -460,6 +477,8 @@ function ItemFields(props: ItemFieldsProps): JSX.Element {
     setCheesePrice,
     jainAvailable,
     setJainAvailable,
+    displayOrder,
+    setDisplayOrder,
   } = props;
 
   return (
@@ -513,6 +532,20 @@ function ItemFields(props: ItemFieldsProps): JSX.Element {
           className="stock-card-input"
           data-testid={`${idPrefix}-cheese-price`}
           placeholder="0 = no cheese option"
+        />
+      </label>
+
+      <label className="stock-add-field">
+        <span>Display order</span>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          value={displayOrder}
+          onChange={(e) => setDisplayOrder(e.target.value)}
+          className="stock-card-input"
+          data-testid={`${idPrefix}-display-order`}
+          placeholder="e.g. 1 (lower shows first)"
         />
       </label>
 

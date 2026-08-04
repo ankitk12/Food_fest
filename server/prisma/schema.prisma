@@ -79,4 +79,5 @@ model FoodItem {
   stallId           String
   cheesePrice       Float?
   jainAvailable     Boolean?
+  displayOrder      Int?
 }
