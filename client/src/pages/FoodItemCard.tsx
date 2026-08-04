@@ -93,7 +93,18 @@ export function FoodItemCard({
         src={item.imageUrl}
         alt={item.name}
       />
-      <h3 className="food-card-name">{item.name}</h3>
+      <h3 className={`food-card-name${jainOffered ? " food-card-name--jain" : ""}`}>
+        {item.name}
+        {jainOffered && (
+          <span
+            className="food-card-jain-badge"
+            data-testid={`food-card-jain-badge-${item.id}`}
+            title="Jain option available"
+          >
+            Jain
+          </span>
+        )}
+      </h3>
       <p className="food-card-description" data-testid="food-card-description">
         {item.description}
       </p>
