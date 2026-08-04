@@ -58,7 +58,6 @@ export function seedStalls(): Stall[] {
 /** Build a fresh copy of default seed coupons. */
 export function seedCoupons(): Coupon[] {
   return [
-    { code: "SAVE10", discountPercent: 10, minOrderValue: 200, active: true },
   ];
 }
 

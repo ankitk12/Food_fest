@@ -37,10 +37,11 @@ export class PrismaPersistence implements PersistenceAdapter {
    * `load()` can return the restored state.
    */
   async init(): Promise<void> {
-    const [customers, wallets, itemStates] = await Promise.all([
+    const [customers, wallets, itemStates, coupons] = await Promise.all([
       this.prisma.customer.findMany(),
       this.prisma.wallet.findMany(),
       this.prisma.itemState.findMany(),
+      this.prisma.coupon.findMany(),
     ]);
 
     const snapshot: StoreSnapshot = {
@@ -53,6 +54,12 @@ export class PrismaPersistence implements PersistenceAdapter {
       wallets: wallets.map((w) => ({
         customerId: w.customerId,
         foodCoins: w.foodCoins,
+      })),
+      coupons: coupons.map((c) => ({
+        code: c.code,
+        discountPercent: c.discountPercent,
+        minOrderValue: c.minOrderValue,
+        active: c.active,
       })),
       itemQuantities: Object.fromEntries(
         itemStates.map((i) => [i.itemId, i.quantity])
@@ -122,6 +129,20 @@ export class PrismaPersistence implements PersistenceAdapter {
       })
     );
 
+    const couponUpserts = (s.coupons ?? []).map((c) => {
+      const code = c.code.toUpperCase();
+      const fields = {
+        discountPercent: c.discountPercent,
+        minOrderValue: c.minOrderValue,
+        active: c.active,
+      };
+      return this.prisma.coupon.upsert({
+        where: { code },
+        create: { code, ...fields },
+        update: { ...fields },
+      });
+    });
+
     const itemDeletions =
       s.deletedItemIds.length > 0
         ? [
@@ -136,6 +157,7 @@ export class PrismaPersistence implements PersistenceAdapter {
       ...walletUpserts,
       ...itemStateUpserts,
       ...customItemUpserts,
+      ...couponUpserts,
       ...itemDeletions,
     ];
 

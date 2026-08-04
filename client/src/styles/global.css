@@ -1271,11 +1271,48 @@ main.home {
   flex: 1 1 160px;
 }
 
-.checkout-desk-field input {
+.checkout-desk-field input,
+.checkout-desk-field select {
   font-weight: 400;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--ia-border);
   border-radius: 8px;
+}
+
+/* Floor selector — segmented pills instead of a native dropdown. */
+.floor-options {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.floor-option {
+  min-width: 3rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--ia-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ia-text);
+  font-family: var(--ia-font-body);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    transform 0.05s ease;
+}
+
+.floor-option:hover {
+  border-color: var(--ia-gold);
+}
+
+.floor-option:active {
+  transform: translateY(1px);
+}
+
+.floor-option--active {
+  background: var(--ia-gold);
+  border-color: var(--ia-gold);
+  color: #0b1712;
 }
 
 .checkout-desk-hint {

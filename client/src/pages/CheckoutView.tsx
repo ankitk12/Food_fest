@@ -394,6 +394,28 @@ export function CheckoutView(): JSX.Element {
 
         {deliveryType === "desk" && (
           <div className="checkout-desk-fields" data-testid="checkout-desk-fields">
+            <div className="checkout-desk-field">
+              <span>Floor no *</span>
+              <div
+                className="floor-options"
+                role="group"
+                aria-label="Floor number"
+                data-testid="checkout-floor-no"
+              >
+                {["1", "2", "6"].map((f) => (
+                  <button
+                    type="button"
+                    key={f}
+                    className={`floor-option${floorNo === f ? " floor-option--active" : ""}`}
+                    aria-pressed={floorNo === f}
+                    data-testid={`floor-option-${f}`}
+                    onClick={() => setFloorNo(f)}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="checkout-desk-field">
               <span>Desk location *</span>
               <input
@@ -404,19 +426,9 @@ export function CheckoutView(): JSX.Element {
                 onChange={(e) => setDeskLocation(e.target.value)}
               />
             </label>
-            <label className="checkout-desk-field">
-              <span>Floor no *</span>
-              <input
-                type="text"
-                data-testid="checkout-floor-no"
-                placeholder="e.g. 3"
-                value={floorNo}
-                onChange={(e) => setFloorNo(e.target.value)}
-              />
-            </label>
             {!deliveryValid && (
               <p className="checkout-desk-hint" role="note">
-                Enter a desk location and floor number to continue.
+                Select a floor and enter a desk location to continue.
               </p>
             )}
           </div>

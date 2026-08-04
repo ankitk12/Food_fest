@@ -231,9 +231,9 @@ function AdminOrdersPanel(): JSX.Element {
                   data-testid={`admin-delivery-${order.token}`}
                 >
                   {order.deliveryType === "desk"
-                    ? `🛎️ Desk delivery — ${order.deskLocation ?? ""}${
-                        order.floorNo ? `, Floor ${order.floorNo}` : ""
-                      }`
+                    ? `🛎️ Desk delivery — ${
+                        order.floorNo ? `Floor ${order.floorNo}` : ""
+                      }, ${order.deskLocation ?? ""}`
                     : "🏪 Collect at stall"}
                 </div>
 
