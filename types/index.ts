@@ -30,13 +30,22 @@ export interface FoodItem {
   availableQuantity: number;
   price: number; // INR, > 0
   stallId: string;
+  /**
+   * Optional extra-cheese add-on price (₹), configured per item by the admin.
+   * When absent or 0, the item offers no cheese add-on.
+   */
+  cheesePrice?: number;
 }
 
 export interface CartItem {
   itemId: string;
   name: string;
-  unitPrice: number; // INR
+  unitPrice: number; // INR — includes any add-on cost (e.g. extra cheese)
   quantity: number; // >= 1
+  /** Whether the "extra cheese" add-on was chosen for this line. */
+  addCheese?: boolean;
+  /** The cheese add-on price for this line's item (₹), when offered. */
+  cheesePrice?: number;
 }
 
 export interface Stall {
@@ -77,6 +86,7 @@ export interface Order {
   deliveryType?: DeliveryType; // how the order is received (defaults to "stall")
   deskLocation?: string; // desk/table location, when deliveryType is "desk"
   floorNo?: string; // floor number, when deliveryType is "desk"
+  pickupTime?: string; // preferred delivery/collection time (e.g. "13:30")
 }
 
 /**

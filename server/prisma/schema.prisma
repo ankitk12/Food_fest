@@ -54,6 +54,7 @@ model Order {
   deliveryType  String?
   deskLocation  String?
   floorNo       String?
+  pickupTime    String?
 }
 
 /// A discount coupon created by the admin (e.g. SAVE10 with 10% off on orders above 200).
@@ -84,4 +85,5 @@ model FoodItem {
   availableQuantity Int
   price             Float
   stallId           String
+  cheesePrice       Float?
 }

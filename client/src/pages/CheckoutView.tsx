@@ -12,7 +12,7 @@ import type { CheckoutResponse } from "../api/client.js";
 import type { Coupon } from "../../../types/index.js";
 import { useCart } from "../cart/CartContext.js";
 import { useCustomer } from "../customer/CustomerContext.js";
-import { toCartItems } from "../cart/cart.js";
+import { toCartItems, cartLineTotal } from "../cart/cart.js";
 import { orderPath } from "../routes.js";
 import { ROUTES } from "../routes.js";
 import { formatINR } from "../format.js";
@@ -103,6 +103,8 @@ export function CheckoutView(): JSX.Element {
   const [deliveryType, setDeliveryType] = useState<"stall" | "desk">("stall");
   const [deskLocation, setDeskLocation] = useState("");
   const [floorNo, setFloorNo] = useState("");
+  // Preferred time to collect / receive the order.
+  const [pickupTime, setPickupTime] = useState("");
 
   useEffect(() => {
     getConfig()
@@ -179,6 +181,7 @@ export function CheckoutView(): JSX.Element {
         ...(deliveryType === "desk"
           ? { deskLocation: deskLocation.trim(), floorNo: floorNo.trim() }
           : {}),
+        ...(pickupTime.trim() ? { pickupTime: pickupTime.trim() } : {}),
         ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
       });
       clearCart();
@@ -282,6 +285,26 @@ export function CheckoutView(): JSX.Element {
   return (
     <main className="checkout">
       <h1>Checkout</h1>
+
+      <ul className="checkout-items" data-testid="checkout-items">
+        {cart.map((line) => (
+          <li
+            key={line.itemId}
+            className="checkout-item"
+            data-testid={`checkout-item-${line.itemId}`}
+          >
+            <span className="checkout-item-name">
+              {line.quantity}× {line.name}
+              {line.addCheese && (
+                <span className="checkout-item-addon"> + Cheese</span>
+              )}
+            </span>
+            <span className="checkout-item-total">
+              {formatINR(cartLineTotal(line))}
+            </span>
+          </li>
+        ))}
+      </ul>
 
       <div className="checkout-summary">
         <p className="checkout-total" data-testid="checkout-total">
@@ -433,6 +456,21 @@ export function CheckoutView(): JSX.Element {
             )}
           </div>
         )}
+
+        <label className="checkout-time-field" data-testid="checkout-time-field">
+          <span>
+            {deliveryType === "desk"
+              ? "Preferred delivery time"
+              : "Preferred pickup time"}
+          </span>
+          <input
+            type="time"
+            className="checkout-time-input"
+            data-testid="checkout-pickup-time"
+            value={pickupTime}
+            onChange={(e) => setPickupTime(e.target.value)}
+          />
+        </label>
       </fieldset>
 
       {state.status === "failed" && (

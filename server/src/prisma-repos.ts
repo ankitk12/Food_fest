@@ -23,6 +23,7 @@ function rowToFoodItem(row: {
   availableQuantity: number;
   price: number;
   stallId: string;
+  cheesePrice?: number | null;
 }): FoodItem {
   return {
     id: row.id,
@@ -33,6 +34,7 @@ function rowToFoodItem(row: {
     availableQuantity: row.availableQuantity,
     price: row.price,
     stallId: row.stallId,
+    ...(row.cheesePrice != null ? { cheesePrice: row.cheesePrice } : {}),
   };
 }
 

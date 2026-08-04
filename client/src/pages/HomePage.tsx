@@ -28,7 +28,7 @@ export function HomePage(): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   useScrollReveal(containerRef);
 
-  const { addItem, cart, increment, decrement, removeItem } = useCart();
+  const { addItem, toggleCheese, cart, increment, decrement, removeItem } = useCart();
 
   const fetchMenu = useCallback(() => getAllItems(), []);
   const { data: items, error, loading } = usePolling<FoodItem[]>(fetchMenu);
@@ -60,14 +60,14 @@ export function HomePage(): JSX.Element {
           </p>
         </header>
 
-        <div className="reward-info-banner">
+        {/* <div className="reward-info-banner">
           <h3>🎁 Earn Rewards on Every Order!</h3>
           <ul className="reward-info-list">
             <li><strong>Earn:</strong> Get 10% reward points on every order total</li>
             <li><strong>Use:</strong> Redeem points at checkout — 2 points = ₹1 off</li>
             <li><strong>Example:</strong> Order ₹100 → earn 10 points → use them for ₹5 off next time</li>
           </ul>
-        </div>
+        </div> */}
 
         {loading && !items && !error && <p role="status">Loading menu…</p>}
 
@@ -91,6 +91,8 @@ export function HomePage(): JSX.Element {
                     item={item}
                     onAddToCart={addItem}
                     cartQuantity={line?.quantity ?? 0}
+                    addCheese={line?.addCheese ?? false}
+                    onToggleCheese={toggleCheese}
                     onIncrement={increment}
                     onDecrement={decrement}
                     onRemove={removeItem}

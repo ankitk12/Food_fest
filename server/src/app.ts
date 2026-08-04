@@ -215,6 +215,7 @@ export function createApp(deps: AppDependencies): Express {
         deliveryType?: unknown;
         deskLocation?: unknown;
         floorNo?: unknown;
+        pickupTime?: unknown;
         couponCode?: unknown;
       };
 
@@ -230,6 +231,8 @@ export function createApp(deps: AppDependencies): Express {
         typeof body.deskLocation === "string" ? body.deskLocation.trim() : "";
       const floorNo =
         typeof body.floorNo === "string" ? body.floorNo.trim() : "";
+      const pickupTime =
+        typeof body.pickupTime === "string" ? body.pickupTime.trim() : "";
       const redeemPoints =
         typeof body.redeemPoints === "number" && body.redeemPoints > 0
           ? Math.floor(body.redeemPoints)
@@ -345,6 +348,7 @@ export function createApp(deps: AppDependencies): Express {
         ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
         deliveryType: deliverToDesk ? "desk" : "stall",
         ...(deliverToDesk ? { deskLocation, floorNo } : {}),
+        ...(pickupTime ? { pickupTime } : {}),
       };
       await orderRepo.save(order);
 
@@ -554,6 +558,7 @@ export function createApp(deps: AppDependencies): Express {
       description?: unknown;
       imageUrl?: unknown;
       rating?: unknown;
+      cheesePrice?: unknown;
       spice?: unknown;
       flavor?: unknown;
       portion?: unknown;
@@ -614,6 +619,13 @@ export function createApp(deps: AppDependencies): Express {
         ? body.rating
         : 4.5;
 
+    const cheesePrice =
+      typeof body.cheesePrice === "number" &&
+      Number.isFinite(body.cheesePrice) &&
+      body.cheesePrice > 0
+        ? body.cheesePrice
+        : 0;
+
     const created = store.createFoodItem({
       name,
       imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : "",
@@ -622,6 +634,7 @@ export function createApp(deps: AppDependencies): Express {
       availableQuantity,
       price: body.price,
       stallId,
+      cheesePrice,
     });
 
     res.status(201).json(created);
@@ -647,6 +660,7 @@ export function createApp(deps: AppDependencies): Express {
       description?: unknown;
       imageUrl?: unknown;
       rating?: unknown;
+      cheesePrice?: unknown;
       spice?: unknown;
       flavor?: unknown;
       portion?: unknown;
@@ -723,6 +737,22 @@ export function createApp(deps: AppDependencies): Express {
         return;
       }
       patch.rating = body.rating;
+    }
+
+    if (body.cheesePrice !== undefined) {
+      if (
+        typeof body.cheesePrice !== "number" ||
+        !Number.isFinite(body.cheesePrice) ||
+        body.cheesePrice < 0
+      ) {
+        const errBody: ApiError = {
+          error: "cheesePrice must be a non-negative number",
+          code: "INVALID_ITEM",
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      patch.cheesePrice = body.cheesePrice;
     }
 
     if (typeof body.description === "string") {
@@ -1036,35 +1066,6 @@ export function createApp(deps: AppDependencies): Express {
   // Validates: Requirements 11.1
   app.get("/api/trending", async (_req: Request, res: Response): Promise<void> => {
     res.status(200).json(rankTrending(await orderRepo.list()));
-  });
-
-  // --- POST /api/ai-chef/recommend ----------------------------------------
-  //
-  // Delegates to the ai-chef domain. The request body carries the three
-  // preference inputs; the item pool is the store's food items, optionally
-  // scoped to a stall via an optional `stallId`.
-  //
-  // Validates: Requirements 8.1
-  app.post("/api/ai-chef/recommend", (req: Request, res: Response): void => {
-    const body = (req.body ?? {}) as {
-      hunger?: unknown;
-      spice?: unknown;
-      taste?: unknown;
-      stallId?: unknown;
-    };
-
-    const prefs: Preferences = {
-      hunger: body.hunger as Preferences["hunger"],
-      spice: body.spice as Preferences["spice"],
-      taste: body.taste as Preferences["taste"],
-    };
-
-    const items =
-      typeof body.stallId === "string"
-        ? store.getMenu(body.stallId)
-        : store.getFoodItems();
-
-    res.status(200).json(recommend(prefs, items));
   });
 
   return app;

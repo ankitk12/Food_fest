@@ -75,6 +75,8 @@ export interface CheckoutRequest {
   deskLocation?: string;
   /** Floor number — required when `deliveryType` is "desk". */
   floorNo?: string;
+  /** Preferred delivery/collection time (e.g. "13:30"). */
+  pickupTime?: string;
   /** Coupon code to apply for a percentage discount (e.g. "SAVE10"). */
   couponCode?: string;
 }
@@ -113,6 +115,7 @@ export interface OrderResponse {
   deliveryType?: "stall" | "desk";
   deskLocation?: string;
   floorNo?: string;
+  pickupTime?: string;
 }
 
 export interface RedeemResponse extends Wallet {}
@@ -224,6 +227,8 @@ export interface CreateItemRequest {
   description?: string;
   imageUrl?: string;
   rating?: number;
+  /** Extra-cheese add-on price (₹). 0 or omitted means no cheese option. */
+  cheesePrice?: number;
 }
 
 /** POST /api/admin/items — create a new food item; returns the created item. */

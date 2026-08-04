@@ -46,7 +46,12 @@ export function CartView(): JSX.Element {
             className="cart-line"
             data-testid={`cart-line-${line.itemId}`}
           >
-            <span className="cart-line-name">{line.name}</span>
+            <span className="cart-line-name">
+              {line.name}
+              {line.addCheese && (
+                <span className="cart-line-addon"> + Cheese</span>
+              )}
+            </span>
             <span className="cart-line-unit-price">
               {formatINR(line.unitPrice)}
             </span>

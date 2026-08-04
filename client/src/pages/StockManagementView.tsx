@@ -160,6 +160,7 @@ function AddItemForm({ onCreated }: AddItemFormProps): JSX.Element {
   const [quantity, setQuantity] = useState("50");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [cheesePrice, setCheesePrice] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +179,7 @@ function AddItemForm({ onCreated }: AddItemFormProps): JSX.Element {
     setQuantity("50");
     setDescription("");
     setImageUrl("");
+    setCheesePrice("");
   }
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
@@ -193,6 +195,7 @@ function AddItemForm({ onCreated }: AddItemFormProps): JSX.Element {
         availableQuantity: quantity.trim() === "" ? 0 : Math.floor(qtyValue),
         description: description.trim() || undefined,
         imageUrl: imageUrl.trim() || undefined,
+        cheesePrice: cheesePrice.trim() === "" ? 0 : Number(cheesePrice),
       };
       const created = await createItem(req);
       setSuccess(`Added “${created.name}”.`);
@@ -245,6 +248,8 @@ function AddItemForm({ onCreated }: AddItemFormProps): JSX.Element {
         setDescription={setDescription}
         imageUrl={imageUrl}
         setImageUrl={setImageUrl}
+        cheesePrice={cheesePrice}
+        setCheesePrice={setCheesePrice}
       />
 
       {error && (
@@ -295,6 +300,9 @@ function EditItemModal({ item, onClose, onSaved }: EditItemModalProps): JSX.Elem
   const [quantity, setQuantity] = useState(String(item.availableQuantity));
   const [description, setDescription] = useState(item.description);
   const [imageUrl, setImageUrl] = useState(item.imageUrl);
+  const [cheesePrice, setCheesePrice] = useState(
+    item.cheesePrice ? String(item.cheesePrice) : ""
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -318,6 +326,7 @@ function EditItemModal({ item, onClose, onSaved }: EditItemModalProps): JSX.Elem
         availableQuantity: Math.floor(qtyValue),
         description,
         imageUrl,
+        cheesePrice: cheesePrice.trim() === "" ? 0 : Number(cheesePrice),
       };
       await updateItem(item.id, patch);
       onSaved();
@@ -370,6 +379,8 @@ function EditItemModal({ item, onClose, onSaved }: EditItemModalProps): JSX.Elem
             setDescription={setDescription}
             imageUrl={imageUrl}
             setImageUrl={setImageUrl}
+            cheesePrice={cheesePrice}
+            setCheesePrice={setCheesePrice}
           />
 
           {error && (
@@ -415,6 +426,8 @@ interface ItemFieldsProps {
   setDescription: (v: string) => void;
   imageUrl: string;
   setImageUrl: (v: string) => void;
+  cheesePrice: string;
+  setCheesePrice: (v: string) => void;
 }
 
 /** Shared field grid used by both the add and edit item forms. */
@@ -432,6 +445,8 @@ function ItemFields(props: ItemFieldsProps): JSX.Element {
     setDescription,
     imageUrl,
     setImageUrl,
+    cheesePrice,
+    setCheesePrice,
   } = props;
 
   return (
@@ -471,6 +486,20 @@ function ItemFields(props: ItemFieldsProps): JSX.Element {
           onChange={(e) => setQuantity(e.target.value)}
           className="stock-card-input"
           data-testid={`${idPrefix}-quantity`}
+        />
+      </label>
+
+      <label className="stock-add-field">
+        <span>Cheese add-on (₹)</span>
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={cheesePrice}
+          onChange={(e) => setCheesePrice(e.target.value)}
+          className="stock-card-input"
+          data-testid={`${idPrefix}-cheese-price`}
+          placeholder="0 = no cheese option"
         />
       </label>
 

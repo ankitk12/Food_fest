@@ -264,6 +264,7 @@ interface OrderRow {
   deliveryType: string | null;
   deskLocation: string | null;
   floorNo: string | null;
+  pickupTime: string | null;
 }
 
 function orderToRow(o: Order): Prisma.OrderCreateManyInput {
@@ -284,6 +285,7 @@ function orderToRow(o: Order): Prisma.OrderCreateManyInput {
     deliveryType: o.deliveryType ?? null,
     deskLocation: o.deskLocation ?? null,
     floorNo: o.floorNo ?? null,
+    pickupTime: o.pickupTime ?? null,
   };
 }
 
@@ -307,6 +309,7 @@ function rowToOrder(row: OrderRow): Order {
       : {}),
     ...(row.deskLocation ? { deskLocation: row.deskLocation } : {}),
     ...(row.floorNo ? { floorNo: row.floorNo } : {}),
+    ...(row.pickupTime ? { pickupTime: row.pickupTime } : {}),
   };
 }
 
@@ -319,6 +322,7 @@ function rowToFoodItem(row: {
   availableQuantity: number;
   price: number;
   stallId: string;
+  cheesePrice?: number | null;
 }): FoodItem {
   return {
     id: row.id,
@@ -329,5 +333,6 @@ function rowToFoodItem(row: {
     availableQuantity: row.availableQuantity,
     price: row.price,
     stallId: row.stallId,
+    ...(row.cheesePrice != null ? { cheesePrice: row.cheesePrice } : {}),
   };
 }

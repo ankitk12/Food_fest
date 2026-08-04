@@ -11,14 +11,20 @@
  * Decreasing to 0 removes the item from the cart.
  */
 
+import { useState } from "react";
 import type { FoodItem } from "../../../types/index.js";
 import { formatINR } from "../format.js";
+import { cheesePriceOf } from "../cart/cart.js";
 
 export interface FoodItemCardProps {
   item: FoodItem;
-  onAddToCart: (item: FoodItem) => void;
+  onAddToCart: (item: FoodItem, addCheese?: boolean) => void;
   /** Current quantity of this item in the cart (0 if not in cart). */
   cartQuantity?: number;
+  /** Whether the cheese add-on is currently on for this item's cart line. */
+  addCheese?: boolean;
+  /** Toggle the cheese add-on for this item's existing cart line. */
+  onToggleCheese?: (itemId: string, addCheese: boolean) => void;
   /** Increment the quantity of this item in the cart. */
   onIncrement?: (itemId: string) => void;
   /** Decrement the quantity of this item in the cart. */
@@ -31,12 +37,27 @@ export function FoodItemCard({
   item,
   onAddToCart,
   cartQuantity = 0,
+  addCheese = false,
+  onToggleCheese,
   onIncrement,
   onDecrement,
   onRemove,
 }: FoodItemCardProps): JSX.Element {
   const unavailable = item.availableQuantity === 0;
   const inCart = cartQuantity > 0;
+  // The cheese add-on price is configured per item by the admin; 0 means the
+  // item offers no cheese option.
+  const cheesePrice = cheesePriceOf(item);
+  const cheeseOffered = cheesePrice > 0;
+  // Cheese choice for a not-yet-added item; once in cart the cart line is the
+  // source of truth (via the `addCheese` prop).
+  const [pendingCheese, setPendingCheese] = useState(false);
+  const cheeseOn = inCart ? addCheese : pendingCheese;
+
+  function handleCheeseChange(next: boolean): void {
+    if (inCart) onToggleCheese?.(item.id, next);
+    else setPendingCheese(next);
+  }
 
   function handleDecrement(): void {
     if (cartQuantity <= 1) {
@@ -75,6 +96,17 @@ export function FoodItemCard({
         {formatINR(item.price)}
       </p>
 
+      {!unavailable && cheeseOffered && (
+        <label className="food-card-addon" data-testid={`food-card-cheese-${item.id}`}>
+          <input
+            type="checkbox"
+            checked={cheeseOn}
+            onChange={(e) => handleCheeseChange(e.target.checked)}
+          />
+          <span>Add cheese (+{formatINR(cheesePrice)})</span>
+        </label>
+      )}
+
       {inCart ? (
         <div className="food-card-quantity-controls" data-testid="food-card-qty-controls">
           <button
@@ -104,7 +136,10 @@ export function FoodItemCard({
           className="food-card-add"
           disabled={unavailable}
           aria-disabled={unavailable}
-          onClick={() => onAddToCart(item)}
+          onClick={() => {
+            onAddToCart(item, pendingCheese);
+            setPendingCheese(false);
+          }}
         >
           Add to Cart
         </button>

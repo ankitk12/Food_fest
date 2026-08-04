@@ -21,6 +21,12 @@ import {
   orderTotal,
 } from "../../../domain/pricing.js";
 
+/** The cheese add-on price for an item (₹), or 0 when the item offers none. */
+export function cheesePriceOf(item: Pick<FoodItem, "cheesePrice">): number {
+  const p = item.cheesePrice ?? 0;
+  return Number.isFinite(p) && p > 0 ? p : 0;
+}
+
 /**
  * A cart line extends the shared `CartItem` with the item's currently
  * available quantity so the cart can clamp increases without re-fetching the
@@ -56,7 +62,7 @@ export function emptyCart(): Cart {
  * Cart button is disabled for sold-out items), and over-quantity limiting is
  * handled separately by {@link setQuantity} (Req 3.5).
  */
-export function addToCart(cart: Cart, item: FoodItem): Cart {
+export function addToCart(cart: Cart, item: FoodItem, addCheese = false): Cart {
   const existing = cart.find((line) => line.itemId === item.id);
   if (existing) {
     return cart.map((line) =>
@@ -69,16 +75,40 @@ export function addToCart(cart: Cart, item: FoodItem): Cart {
         : line
     );
   }
+  const cheesePrice = cheesePriceOf(item);
+  const withCheese = addCheese && cheesePrice > 0;
   return [
     ...cart,
     {
       itemId: item.id,
       name: item.name,
-      unitPrice: item.price,
+      unitPrice: item.price + (withCheese ? cheesePrice : 0),
       quantity: 1,
       availableQuantity: item.availableQuantity,
+      ...(cheesePrice > 0 ? { cheesePrice } : {}),
+      ...(withCheese ? { addCheese: true } : {}),
     },
   ];
+}
+
+/**
+ * Toggle the extra-cheese add-on on an existing cart line, adjusting the line's
+ * unit price by the add-on cost. No-op when the item is not in the cart.
+ */
+export function setCheese(cart: Cart, itemId: string, addCheese: boolean): Cart {
+  return cart.map((line) => {
+    if (line.itemId !== itemId) return line;
+    const cheesePrice = line.cheesePrice ?? 0;
+    const base = line.unitPrice - (line.addCheese ? cheesePrice : 0);
+    const on = addCheese && cheesePrice > 0;
+    const next: CartLine = {
+      ...line,
+      unitPrice: base + (on ? cheesePrice : 0),
+    };
+    if (on) next.addCheese = true;
+    else delete next.addCheese;
+    return next;
+  });
 }
 
 /**

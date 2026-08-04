@@ -235,6 +235,7 @@ function AdminOrdersPanel(): JSX.Element {
                         order.floorNo ? `Floor ${order.floorNo}` : ""
                       }, ${order.deskLocation ?? ""}`
                     : "🏪 Collect at stall"}
+                  {order.pickupTime ? ` · ⏰ ${order.pickupTime}` : ""}
                 </div>
 
                 <div className="admin-order-card-items">

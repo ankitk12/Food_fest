@@ -58,11 +58,11 @@ export function SiteHeader(): JSX.Element {
             <NavLink to={ROUTES.trending} className="site-nav-link">
               Trending
             </NavLink>
-            {!isAdmin && (
+            {/* {!isAdmin && (
               <NavLink to={walletTarget} className="site-nav-link">
                 Rewards
               </NavLink>
-            )}
+            )} */}
             {isAdmin && (
               <NavLink to={ROUTES.admin} className="site-nav-link">
                 Orders
