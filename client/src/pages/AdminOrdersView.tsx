@@ -160,9 +160,9 @@ function AdminOrdersPanel(): JSX.Element {
     <main className="admin">
       <header className="admin-header">
         <h1>Order Management</h1>
-        <p className="admin-note" data-testid="admin-note">
+        {/* <p className="admin-note" data-testid="admin-note">
           Staff view — order and payment actions are unauthenticated in this demo.
-        </p>
+        </p> */}
         <div className="admin-search">
           <input
             type="text"

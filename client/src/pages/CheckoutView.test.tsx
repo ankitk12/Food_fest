@@ -157,3 +157,46 @@ describe("CheckoutView payment failure (Req 5.3)", () => {
     );
   });
 });
+
+describe("CheckoutView customer mobile and name validation", () => {
+  it("shows an error when customer has an invalid mobile number", async () => {
+    window.localStorage.setItem(
+      CUSTOMER_STORAGE_KEY,
+      JSON.stringify({ mobile: "12345", name: "Asha" })
+    );
+
+    renderCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "seed-cart" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Pay with UPI" }));
+
+    const errorMsg = await screen.findByTestId("payment-error");
+    expect(errorMsg).toHaveTextContent("Please enter a valid mobile number");
+    expect(checkoutMock).not.toHaveBeenCalled();
+  });
+
+  it("shows an error when customer name is empty", async () => {
+    window.localStorage.setItem(
+      CUSTOMER_STORAGE_KEY,
+      JSON.stringify({ mobile: "9876543210", name: "   " })
+    );
+
+    renderCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "seed-cart" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Pay with UPI" }));
+
+    const errorMsg = await screen.findByTestId("payment-error");
+    expect(errorMsg).toHaveTextContent("Please enter your name.");
+    expect(checkoutMock).not.toHaveBeenCalled();
+  });
+
+  it("gates checkout with CustomerForm when no customer is present and validates input", async () => {
+    window.localStorage.clear();
+
+    renderCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "seed-cart" }));
+
+    expect(screen.getByTestId("checkout-identity-prompt")).toBeInTheDocument();
+    expect(screen.getByTestId("profile-mobile")).toBeInTheDocument();
+    expect(screen.getByTestId("profile-name")).toBeInTheDocument();
+  });
+});

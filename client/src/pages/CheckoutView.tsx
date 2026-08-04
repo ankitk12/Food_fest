@@ -24,8 +24,9 @@ import { orderPath } from "../routes.js";
 import { ROUTES } from "../routes.js";
 import { formatINR } from "../format.js";
 import { DEMO_STALL_ID } from "../demo.js";
-import { CustomerForm } from "./ProfileView.js";
+import { CustomerForm, INDIAN_MOBILE_HELP } from "./ProfileView.js";
 import { ADMIN_MOBILES } from "../constants.js";
+import { isValidMobile } from "../../../domain/mobile.js";
 
 type CheckoutState =
   | { status: "idle" }
@@ -227,11 +228,42 @@ export function CheckoutView(): JSX.Element {
     deliveryType === "stall" ||
     (deskLocation.trim() !== "" && floorNo.trim() !== "");
 
+  function validateCustomer(): { valid: boolean; customerId: string; customerName?: string } {
+    if (!customer) {
+      setState({ status: "failed", message: "Please enter your mobile number to continue." });
+      return { valid: false, customerId: "" };
+    }
+
+    const finalCustomerId = isAdmin && adminCustomerMobile.trim() ? adminCustomerMobile.trim() : customer.mobile;
+    const finalCustomerName = isAdmin && adminCustomerName.trim() ? adminCustomerName.trim() : customer.name;
+
+    if (!isValidMobile(finalCustomerId)) {
+      setState({ status: "failed", message: INDIAN_MOBILE_HELP });
+      return { valid: false, customerId: "" };
+    }
+
+    if (!finalCustomerName || finalCustomerName.trim() === "") {
+      setState({ status: "failed", message: "Please enter your name." });
+      return { valid: false, customerId: "" };
+    }
+
+    return { valid: true, customerId: finalCustomerId, customerName: finalCustomerName.trim() };
+  }
+
+  function handleOpenUpi(): void {
+    const customerValidation = validateCustomer();
+    if (!customerValidation.valid) return;
+    setShowUpi(true);
+  }
+
   async function handlePay(method: "UPI" | "cash"): Promise<void> {
     if (!customer || !deliveryValid) return;
+    const customerValidation = validateCustomer();
+    if (!customerValidation.valid) return;
+
     const stallId = DEMO_STALL_ID;
-    const finalCustomerId = isAdmin && adminCustomerMobile.trim() ? adminCustomerMobile.trim() : customer.mobile;
-    const finalCustomerName = isAdmin && adminCustomerName.trim() ? adminCustomerName.trim() : undefined;
+    const finalCustomerId = customerValidation.customerId;
+    const finalCustomerName = customerValidation.customerName;
 
     setState({ status: "paying" });
     try {
@@ -284,6 +316,9 @@ export function CheckoutView(): JSX.Element {
    */
   async function handleRazorpay(): Promise<void> {
     if (!customer || !deliveryValid) return;
+    const customerValidation = validateCustomer();
+    if (!customerValidation.valid) return;
+
     if (!window.Razorpay) {
       setState({
         status: "failed",
@@ -297,8 +332,8 @@ export function CheckoutView(): JSX.Element {
       return;
     }
 
-    const finalCustomerId = isAdmin && adminCustomerMobile.trim() ? adminCustomerMobile.trim() : customer.mobile;
-    const finalCustomerName = isAdmin && adminCustomerName.trim() ? adminCustomerName.trim() : undefined;
+    const finalCustomerId = customerValidation.customerId;
+    const finalCustomerName = customerValidation.customerName;
 
     setState({ status: "paying" });
     try {
@@ -576,10 +611,12 @@ export function CheckoutView(): JSX.Element {
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <input
               type="tel"
+              inputMode="numeric"
+              maxLength={10}
               className="customer-form-input"
               placeholder="Customer Mobile Number"
               value={adminCustomerMobile}
-              onChange={(e) => setAdminCustomerMobile(e.target.value)}
+              onChange={(e) => setAdminCustomerMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
               style={{ flex: '1 1 200px' }}
             />
             <input
@@ -713,7 +750,7 @@ export function CheckoutView(): JSX.Element {
             <button
               type="button"
               className="checkout-pay checkout-pay--upi"
-              onClick={() => setShowUpi(true)}
+              onClick={handleOpenUpi}
               disabled={state.status === "paying" || !deliveryValid}
             >
               Pay with UPI

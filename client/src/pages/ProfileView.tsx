@@ -20,7 +20,7 @@ import { ROUTES } from "../routes.js";
 import type { Customer } from "../../../types/index.js";
 import { isValidMobile } from "../../../domain/mobile.js";
 
-const INDIAN_MOBILE_HELP =
+export const INDIAN_MOBILE_HELP =
   "Please enter a valid mobile number";
 
 export interface CustomerFormProps {
