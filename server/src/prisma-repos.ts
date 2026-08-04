@@ -5,7 +5,7 @@
  *   - Customer table -> PrismaCustomerRepo
  *   - Wallet table -> PrismaWalletRepo
  *   - Referral table -> PrismaReferralRepo
- *   - FoodItem & ItemState tables -> PrismaFoodItemRepo
+ *   - FoodItem table (stock/price included) -> PrismaFoodItemRepo
  */
 
 import type { PrismaClient } from "@prisma/client";
@@ -128,83 +128,39 @@ export class PrismaFoodItemRepo implements FoodItemRepo {
   constructor(private readonly prisma: PrismaClient) {}
 
   async list(): Promise<FoodItem[]> {
-    const [foodItems, itemStates] = await Promise.all([
-      this.prisma.foodItem.findMany(),
-      this.prisma.itemState.findMany(),
-    ]);
-
-    const stateMap = new Map(itemStates.map((s) => [s.itemId, s]));
-
-    return foodItems.map((item) => {
-      const state = stateMap.get(item.id);
-      return rowToFoodItem({
-        ...item,
-        availableQuantity: state ? state.quantity : item.availableQuantity,
-        price: state ? state.price : item.price,
-      });
-    });
+    const foodItems = await this.prisma.foodItem.findMany();
+    return foodItems.map((item) => rowToFoodItem(item));
   }
 
   async get(id: string): Promise<FoodItem | undefined> {
-    const [item, state] = await Promise.all([
-      this.prisma.foodItem.findUnique({ where: { id } }),
-      this.prisma.itemState.findUnique({ where: { itemId: id } }),
-    ]);
-
-    if (!item) return undefined;
-    return rowToFoodItem({
-      ...item,
-      availableQuantity: state ? state.quantity : item.availableQuantity,
-      price: state ? state.price : item.price,
-    });
+    const item = await this.prisma.foodItem.findUnique({ where: { id } });
+    return item ? rowToFoodItem(item) : undefined;
   }
 
   async save(item: FoodItem): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.foodItem.upsert({
-        where: { id: item.id },
-        create: { ...item },
-        update: { ...item },
-      }),
-      this.prisma.itemState.upsert({
-        where: { itemId: item.id },
-        create: {
-          itemId: item.id,
-          quantity: item.availableQuantity,
-          price: item.price,
-        },
-        update: {
-          quantity: item.availableQuantity,
-          price: item.price,
-        },
-      }),
-    ]);
+    // Stock and price live on the FoodItem row itself — no separate table.
+    await this.prisma.foodItem.upsert({
+      where: { id: item.id },
+      create: { ...item },
+      update: { ...item },
+    });
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.foodItem.deleteMany({ where: { id } }),
-      this.prisma.itemState.deleteMany({ where: { itemId: id } }),
-    ]);
+    await this.prisma.foodItem.deleteMany({ where: { id } });
   }
 
   async updateStock(id: string, availableQuantity: number): Promise<void> {
-    const item = await this.prisma.foodItem.findUnique({ where: { id } });
-    const currentPrice = item ? item.price : 0;
-    await this.prisma.itemState.upsert({
-      where: { itemId: id },
-      create: { itemId: id, quantity: availableQuantity, price: currentPrice },
-      update: { quantity: availableQuantity },
+    await this.prisma.foodItem.update({
+      where: { id },
+      data: { availableQuantity },
     });
   }
 
   async updatePrice(id: string, price: number): Promise<void> {
-    const item = await this.prisma.foodItem.findUnique({ where: { id } });
-    const currentQty = item ? item.availableQuantity : 0;
-    await this.prisma.itemState.upsert({
-      where: { itemId: id },
-      create: { itemId: id, quantity: currentQty, price },
-      update: { price },
+    await this.prisma.foodItem.update({
+      where: { id },
+      data: { price },
     });
   }
 }

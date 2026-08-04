@@ -65,14 +65,6 @@ model Coupon {
   active          Boolean @default(true)
 }
 
-/// Per-item stock/price overrides applied on top of the seeded catalogue.
-model ItemState {
-  itemId   String @id
-  quantity Int
-  price    Float
-}
-
-
 /// The food catalogue. Holds both the seeded items and any items the admin
 /// creates at runtime (custom items are upserted into this same table so the
 /// catalogue is the single source of truth).

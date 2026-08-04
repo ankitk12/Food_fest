@@ -1,7 +1,7 @@
 /**
  * Prisma/Postgres persistence for the ByteBites Store, mapped to per-entity
- * relational tables (Customer, Wallet, Order, ItemState, CustomItem)
- * rather than a single JSON blob.
+ * relational tables (Customer, Wallet, Order, Coupon, FoodItem) rather than a
+ * single JSON blob. Stock and price live on the FoodItem row itself.
  */
 
 import { PrismaClient, Prisma } from "@prisma/client";
@@ -37,10 +37,9 @@ export class PrismaPersistence implements PersistenceAdapter {
    * `load()` can return the restored state.
    */
   async init(): Promise<void> {
-    const [customers, wallets, itemStates, coupons] = await Promise.all([
+    const [customers, wallets, coupons] = await Promise.all([
       this.prisma.customer.findMany(),
       this.prisma.wallet.findMany(),
-      this.prisma.itemState.findMany(),
       this.prisma.coupon.findMany(),
     ]);
 
@@ -61,12 +60,7 @@ export class PrismaPersistence implements PersistenceAdapter {
         minOrderValue: c.minOrderValue,
         active: c.active,
       })),
-      itemQuantities: Object.fromEntries(
-        itemStates.map((i) => [i.itemId, i.quantity])
-      ),
-      itemPrices: Object.fromEntries(
-        itemStates.map((i) => [i.itemId, i.price])
-      ),
+      // Stock/price live on the FoodItem table itself (no ItemState table).
     };
 
     this.latest = snapshot;
@@ -90,11 +84,6 @@ export class PrismaPersistence implements PersistenceAdapter {
 
   /** Upsert all snapshot items into PostgreSQL atomically without deleting tables. */
   private async persistAll(s: StoreSnapshot): Promise<void> {
-    const itemIds = new Set<string>([
-      ...Object.keys(s.itemQuantities),
-      ...Object.keys(s.itemPrices),
-    ]);
-
     const customerUpserts = s.customers.map((c) =>
       this.prisma.customer.upsert({
         where: { mobile: c.mobile },
@@ -110,16 +99,6 @@ export class PrismaPersistence implements PersistenceAdapter {
         update: { foodCoins: w.foodCoins },
       })
     );
-
-    const itemStateUpserts = Array.from(itemIds).map((itemId) => {
-      const quantity = s.itemQuantities[itemId] ?? 0;
-      const price = s.itemPrices[itemId] ?? 0;
-      return this.prisma.itemState.upsert({
-        where: { itemId },
-        create: { itemId, quantity, price },
-        update: { quantity, price },
-      });
-    });
 
     const customItemUpserts = s.customItems.map((i) =>
       this.prisma.foodItem.upsert({
@@ -155,7 +134,6 @@ export class PrismaPersistence implements PersistenceAdapter {
     const operations = [
       ...customerUpserts,
       ...walletUpserts,
-      ...itemStateUpserts,
       ...customItemUpserts,
       ...couponUpserts,
       ...itemDeletions,
