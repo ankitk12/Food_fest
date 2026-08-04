@@ -315,8 +315,8 @@ export function createApp(deps: AppDependencies): Express {
         discount = Math.min(discount, subtotal);
         appliedCouponCode = coupon.code;
       } else if (redeemPoints > 0) {
-        const wallet = store.getWallet(customerId);
-        const usable = Math.min(redeemPoints, wallet.foodCoins);
+        const wallet = await walletRepo.get(customerId);
+        const usable = Math.min(redeemPoints, wallet?.foodCoins ?? 0);
         discount = usable * 0.50; // 2 points = ₹1
         // Don't discount more than the order total.
         discount = Math.min(discount, subtotal);
@@ -353,13 +353,14 @@ export function createApp(deps: AppDependencies): Express {
       await orderRepo.save(order);
 
       // Deduct ordered quantities from stock so availability updates in
-      // real-time for other users browsing the marketplace.
+      // real-time for other users. Written directly to the DB (awaited) so the
+      // change is durable immediately, not on a background write.
       for (const cartItem of items) {
-        const currentItem = store.getFoodItem(cartItem.itemId);
+        const currentItem = await foodItemRepo.get(cartItem.itemId);
         if (currentItem) {
-          store.setAvailableQuantity(
+          await foodItemRepo.updateStock(
             cartItem.itemId,
-            currentItem.availableQuantity - cartItem.quantity
+            Math.max(0, currentItem.availableQuantity - cartItem.quantity)
           );
         }
       }
@@ -550,7 +551,7 @@ export function createApp(deps: AppDependencies): Express {
   // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
   // for the festival demo and MUST be placed behind seller authentication in
   // production.
-  app.post("/api/admin/items", (req: Request, res: Response): void => {
+  app.post("/api/admin/items", async (req: Request, res: Response): Promise<void> => {
     const body = (req.body ?? {}) as {
       name?: unknown;
       price?: unknown;
@@ -637,6 +638,11 @@ export function createApp(deps: AppDependencies): Express {
       cheesePrice,
     });
 
+    // Also write directly to the catalogue table (awaited) so the new item is
+    // durable immediately, and flush any pending snapshot write.
+    await foodItemRepo.save(created);
+    await store.flush();
+
     res.status(201).json(created);
   });
 
@@ -651,7 +657,7 @@ export function createApp(deps: AppDependencies): Express {
   // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
   // for the festival demo and MUST be placed behind seller authentication in
   // production.
-  app.patch("/api/admin/items/:itemId", (req: Request, res: Response): void => {
+  app.patch("/api/admin/items/:itemId", async (req: Request, res: Response): Promise<void> => {
     const { itemId } = req.params;
     const body = (req.body ?? {}) as {
       name?: unknown;
@@ -763,6 +769,10 @@ export function createApp(deps: AppDependencies): Express {
     }
 
     const updated = store.updateFoodItem(itemId, patch);
+    // Persist the edit directly to the catalogue table (awaited) so it's
+    // durable immediately, then flush any pending snapshot write.
+    if (updated) await foodItemRepo.save(updated);
+    await store.flush();
     res.status(200).json(updated);
   });
 

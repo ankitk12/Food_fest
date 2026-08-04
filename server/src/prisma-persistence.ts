@@ -182,6 +182,16 @@ export class PrismaPersistence implements PersistenceAdapter {
   }
 
   /**
+   * Await the pending write-through so the latest snapshot is durably committed
+   * to Postgres before the caller (e.g. an HTTP handler) returns. Essential on
+   * serverless, where the function may be frozen right after the response and a
+   * fire-and-forget write would otherwise never complete.
+   */
+  async flush(): Promise<void> {
+    await this.writeChain;
+  }
+
+  /**
    * Build an order repository that reads/writes the Order table directly using
    * this instance's Prisma client (shares the same connection/pool).
    */

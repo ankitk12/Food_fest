@@ -78,6 +78,12 @@ export function emptySnapshot(): StoreSnapshot {
 export interface PersistenceAdapter {
   load(): StoreSnapshot | null;
   save(snapshot: StoreSnapshot): void;
+  /**
+   * Await any pending asynchronous write so the latest `save` is durably
+   * committed. Optional: synchronous adapters (JSON file, no-op) are already
+   * durable on return and don't implement it.
+   */
+  flush?(): Promise<void>;
 }
 
 /**

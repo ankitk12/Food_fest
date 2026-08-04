@@ -257,6 +257,15 @@ export class Store {
   }
 
   /**
+   * Await any pending write-through so the most recent mutation is durably
+   * committed before returning. A no-op for synchronous backends (JSON file,
+   * no-op) which are already durable on return.
+   */
+  async flush(): Promise<void> {
+    await this.persistence.flush?.();
+  }
+
+  /**
    * Restore the deterministic seed state. Clears all runtime state (orders,
    * wallets, and any mutations to stalls/items) and repopulates
    * stalls and food items from the seed. When constructed without an override
