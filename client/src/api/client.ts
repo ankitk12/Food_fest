@@ -229,6 +229,8 @@ export interface CreateItemRequest {
   rating?: number;
   /** Extra-cheese add-on price (₹). 0 or omitted means no cheese option. */
   cheesePrice?: number;
+  /** Whether a Jain version of this item is available. */
+  jainAvailable?: boolean;
 }
 
 /** POST /api/admin/items — create a new food item; returns the created item. */

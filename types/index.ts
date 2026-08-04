@@ -35,6 +35,11 @@ export interface FoodItem {
    * When absent or 0, the item offers no cheese add-on.
    */
   cheesePrice?: number;
+  /**
+   * Whether a Jain version of this item is available, configured per item by
+   * the admin. When true, the customer can request the Jain option (no charge).
+   */
+  jainAvailable?: boolean;
 }
 
 export interface CartItem {
@@ -46,6 +51,8 @@ export interface CartItem {
   addCheese?: boolean;
   /** The cheese add-on price for this line's item (₹), when offered. */
   cheesePrice?: number;
+  /** Whether the customer requested the Jain version of this line's item. */
+  jain?: boolean;
 }
 
 export interface Stall {

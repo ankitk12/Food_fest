@@ -363,6 +363,14 @@ export function createApp(deps: AppDependencies): Express {
             Math.max(0, currentItem.availableQuantity - cartItem.quantity)
           );
         }
+
+        const currentItem1 = store.getFoodItem(cartItem.itemId);
+        if (currentItem1) {
+          store.setAvailableQuantity(
+            cartItem.itemId,
+            currentItem1.availableQuantity - cartItem.quantity
+          );
+        }
       }
 
       const coinsEarned = coinsForOrder(total);
@@ -560,6 +568,7 @@ export function createApp(deps: AppDependencies): Express {
       imageUrl?: unknown;
       rating?: unknown;
       cheesePrice?: unknown;
+      jainAvailable?: unknown;
       spice?: unknown;
       flavor?: unknown;
       portion?: unknown;
@@ -636,6 +645,7 @@ export function createApp(deps: AppDependencies): Express {
       price: body.price,
       stallId,
       cheesePrice,
+      jainAvailable: body.jainAvailable === true,
     });
 
     // Also write directly to the catalogue table (awaited) so the new item is
@@ -667,6 +677,7 @@ export function createApp(deps: AppDependencies): Express {
       imageUrl?: unknown;
       rating?: unknown;
       cheesePrice?: unknown;
+      jainAvailable?: unknown;
       spice?: unknown;
       flavor?: unknown;
       portion?: unknown;
@@ -759,6 +770,10 @@ export function createApp(deps: AppDependencies): Express {
         return;
       }
       patch.cheesePrice = body.cheesePrice;
+    }
+
+    if (typeof body.jainAvailable === "boolean") {
+      patch.jainAvailable = body.jainAvailable;
     }
 
     if (typeof body.description === "string") {

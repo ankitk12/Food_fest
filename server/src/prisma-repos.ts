@@ -24,6 +24,7 @@ function rowToFoodItem(row: {
   price: number;
   stallId: string;
   cheesePrice?: number | null;
+  jainAvailable?: boolean | null;
 }): FoodItem {
   return {
     id: row.id,
@@ -35,6 +36,7 @@ function rowToFoodItem(row: {
     price: row.price,
     stallId: row.stallId,
     ...(row.cheesePrice != null ? { cheesePrice: row.cheesePrice } : {}),
+    ...(row.jainAvailable != null ? { jainAvailable: row.jainAvailable } : {}),
   };
 }
 

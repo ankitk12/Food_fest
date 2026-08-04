@@ -1317,19 +1317,67 @@ main.home {
 
 /* --- cheese add-on toggle on food cards --- */
 .food-card-addon {
-  display: flex;
+  display: inline-flex;
+  align-self: flex-start;
+  width: fit-content;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.9rem;
-  color: var(--ia-text-muted);
-  margin: 0.25rem 0 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ia-text);
   cursor: pointer;
+  padding: 0.3rem 0.7rem;
+  margin: 0.15rem 0.4rem 0.35rem 0;
+  border: 1px solid var(--ia-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+
+.food-card-addon:hover {
+  border-color: var(--ia-gold);
 }
 
 .food-card-addon input {
-  accent-color: var(--ia-gold);
+  appearance: none;
+  -webkit-appearance: none;
   width: 1rem;
   height: 1rem;
+  min-width: 1rem;
+  margin: 0;
+  flex: none;
+  border: 1px solid var(--ia-border);
+  border-radius: 4px;
+  background: transparent;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+.food-card-addon input::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 2px;
+  transform: scale(0);
+  transition: transform 0.12s ease;
+  background: #0b1712;
+}
+
+.food-card-addon input:checked {
+  background: var(--ia-gold);
+  border-color: var(--ia-gold);
+}
+
+.food-card-addon input:checked::before {
+  transform: scale(1);
+}
+
+/* Whole chip reflects the checked state. */
+.food-card-addon:has(input:checked) {
+  background: rgba(255, 180, 58, 0.16);
+  border-color: var(--ia-gold);
 }
 
 /* --- checkout order items list --- */
@@ -2629,6 +2677,23 @@ main.home {
    used by the per-card stock/price inputs). */
 .stock-add-field .stock-card-input {
   width: 100%;
+}
+
+/* Checkbox field (e.g. "Jain option available"): inline row, not stacked. */
+.stock-add-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--ia-text);
+}
+
+.stock-add-checkbox input {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+  margin: 0;
+  accent-color: var(--ia-gold);
 }
 
 .stock-add-actions {

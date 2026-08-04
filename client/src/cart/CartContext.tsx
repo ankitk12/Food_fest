@@ -22,6 +22,7 @@ import type { FoodItem } from "../../../types/index.js";
 import {
   addToCart as addToCartPure,
   setCheese as setCheesePure,
+  setJain as setJainPure,
   cartTotal,
   emptyCart,
   removeItem as removeItemPure,
@@ -33,10 +34,12 @@ export interface CartContextValue {
   cart: Cart;
   /** Order total in INR (sum of line totals). */
   total: number;
-  /** Add one unit of the given food item to the cart (optionally with cheese). */
-  addItem: (item: FoodItem, addCheese?: boolean) => void;
+  /** Add one unit of the given food item (optionally with cheese / Jain). */
+  addItem: (item: FoodItem, addCheese?: boolean, jain?: boolean) => void;
   /** Toggle the extra-cheese add-on on an existing cart line. */
   toggleCheese: (itemId: string, addCheese: boolean) => void;
+  /** Toggle the Jain option on an existing cart line. */
+  toggleJain: (itemId: string, jain: boolean) => void;
   /** Set an explicit quantity for a line, clamping to availability. */
   setItemQuantity: (itemId: string, quantity: number) => void;
   /** Increase a line's quantity by one (clamped to availability). */
@@ -59,12 +62,16 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
   const [cart, setCart] = useState<Cart>(emptyCart);
   const [clampedItemId, setClampedItemId] = useState<string | null>(null);
 
-  const addItem = useCallback((item: FoodItem, addCheese = false) => {
-    setCart((current) => addToCartPure(current, item, addCheese));
+  const addItem = useCallback((item: FoodItem, addCheese = false, jain = false) => {
+    setCart((current) => addToCartPure(current, item, addCheese, jain));
   }, []);
 
   const toggleCheese = useCallback((itemId: string, addCheese: boolean) => {
     setCart((current) => setCheesePure(current, itemId, addCheese));
+  }, []);
+
+  const toggleJain = useCallback((itemId: string, jain: boolean) => {
+    setCart((current) => setJainPure(current, itemId, jain));
   }, []);
 
   const applyQuantity = useCallback((itemId: string, quantity: number) => {
@@ -129,6 +136,7 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
       total: cartTotal(cart),
       addItem,
       toggleCheese,
+      toggleJain,
       setItemQuantity,
       increment,
       decrement,
@@ -141,6 +149,7 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
       cart,
       addItem,
       toggleCheese,
+      toggleJain,
       setItemQuantity,
       increment,
       decrement,

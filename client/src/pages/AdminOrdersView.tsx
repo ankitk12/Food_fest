@@ -34,7 +34,14 @@ type AdminTab = "new" | "processing" | "completed" | "place";
 /** Summarize a list of cart items as "2× Paneer Tikka, 1× Naan". */
 function itemsSummary(items: OrderResponse["items"]): string {
   if (items.length === 0) return "—";
-  return items.map((i) => `${i.quantity}× ${i.name}`).join(", ");
+  return items
+    .map((i) => {
+      const tags = [i.addCheese ? "+Cheese" : "", i.jain ? "Jain" : ""]
+        .filter(Boolean)
+        .join(", ");
+      return `${i.quantity}× ${i.name}${tags ? ` (${tags})` : ""}`;
+    })
+    .join(", ");
 }
 
 /** The next status in the lifecycle, or null when already at the final status. */

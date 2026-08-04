@@ -18,13 +18,17 @@ import { cheesePriceOf } from "../cart/cart.js";
 
 export interface FoodItemCardProps {
   item: FoodItem;
-  onAddToCart: (item: FoodItem, addCheese?: boolean) => void;
+  onAddToCart: (item: FoodItem, addCheese?: boolean, jain?: boolean) => void;
   /** Current quantity of this item in the cart (0 if not in cart). */
   cartQuantity?: number;
   /** Whether the cheese add-on is currently on for this item's cart line. */
   addCheese?: boolean;
   /** Toggle the cheese add-on for this item's existing cart line. */
   onToggleCheese?: (itemId: string, addCheese: boolean) => void;
+  /** Whether the Jain option is currently on for this item's cart line. */
+  jain?: boolean;
+  /** Toggle the Jain option for this item's existing cart line. */
+  onToggleJain?: (itemId: string, jain: boolean) => void;
   /** Increment the quantity of this item in the cart. */
   onIncrement?: (itemId: string) => void;
   /** Decrement the quantity of this item in the cart. */
@@ -39,6 +43,8 @@ export function FoodItemCard({
   cartQuantity = 0,
   addCheese = false,
   onToggleCheese,
+  jain = false,
+  onToggleJain,
   onIncrement,
   onDecrement,
   onRemove,
@@ -49,14 +55,22 @@ export function FoodItemCard({
   // item offers no cheese option.
   const cheesePrice = cheesePriceOf(item);
   const cheeseOffered = cheesePrice > 0;
-  // Cheese choice for a not-yet-added item; once in cart the cart line is the
-  // source of truth (via the `addCheese` prop).
+  const jainOffered = item.jainAvailable === true;
+  // Choices for a not-yet-added item; once in cart the cart line is the source
+  // of truth (via the `addCheese` / `jain` props).
   const [pendingCheese, setPendingCheese] = useState(false);
+  const [pendingJain, setPendingJain] = useState(false);
   const cheeseOn = inCart ? addCheese : pendingCheese;
+  const jainOn = inCart ? jain : pendingJain;
 
   function handleCheeseChange(next: boolean): void {
     if (inCart) onToggleCheese?.(item.id, next);
     else setPendingCheese(next);
+  }
+
+  function handleJainChange(next: boolean): void {
+    if (inCart) onToggleJain?.(item.id, next);
+    else setPendingJain(next);
   }
 
   function handleDecrement(): void {
@@ -107,6 +121,17 @@ export function FoodItemCard({
         </label>
       )}
 
+      {!unavailable && jainOffered && (
+        <label className="food-card-addon" data-testid={`food-card-jain-${item.id}`}>
+          <input
+            type="checkbox"
+            checked={jainOn}
+            onChange={(e) => handleJainChange(e.target.checked)}
+          />
+          <span>Jain</span>
+        </label>
+      )}
+
       {inCart ? (
         <div className="food-card-quantity-controls" data-testid="food-card-qty-controls">
           <button
@@ -137,8 +162,9 @@ export function FoodItemCard({
           disabled={unavailable}
           aria-disabled={unavailable}
           onClick={() => {
-            onAddToCart(item, pendingCheese);
+            onAddToCart(item, pendingCheese, pendingJain);
             setPendingCheese(false);
+            setPendingJain(false);
           }}
         >
           Add to Cart

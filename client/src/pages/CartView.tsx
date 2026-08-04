@@ -51,6 +51,7 @@ export function CartView(): JSX.Element {
               {line.addCheese && (
                 <span className="cart-line-addon"> + Cheese</span>
               )}
+              {line.jain && <span className="cart-line-addon"> · Jain</span>}
             </span>
             <span className="cart-line-unit-price">
               {formatINR(line.unitPrice)}

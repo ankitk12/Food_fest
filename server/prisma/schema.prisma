@@ -86,4 +86,5 @@ model FoodItem {
   price             Float
   stallId           String
   cheesePrice       Float?
+  jainAvailable     Boolean?
 }

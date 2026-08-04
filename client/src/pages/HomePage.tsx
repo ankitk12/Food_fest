@@ -28,7 +28,8 @@ export function HomePage(): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   useScrollReveal(containerRef);
 
-  const { addItem, toggleCheese, cart, increment, decrement, removeItem } = useCart();
+  const { addItem, toggleCheese, toggleJain, cart, increment, decrement, removeItem } =
+    useCart();
 
   const fetchMenu = useCallback(() => getAllItems(), []);
   const { data: items, error, loading } = usePolling<FoodItem[]>(fetchMenu);
@@ -93,6 +94,8 @@ export function HomePage(): JSX.Element {
                     cartQuantity={line?.quantity ?? 0}
                     addCheese={line?.addCheese ?? false}
                     onToggleCheese={toggleCheese}
+                    jain={line?.jain ?? false}
+                    onToggleJain={toggleJain}
                     onIncrement={increment}
                     onDecrement={decrement}
                     onRemove={removeItem}

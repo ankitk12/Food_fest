@@ -298,6 +298,7 @@ export function CheckoutView(): JSX.Element {
               {line.addCheese && (
                 <span className="checkout-item-addon"> + Cheese</span>
               )}
+              {line.jain && <span className="checkout-item-addon"> · Jain</span>}
             </span>
             <span className="checkout-item-total">
               {formatINR(cartLineTotal(line))}

@@ -62,7 +62,12 @@ export function emptyCart(): Cart {
  * Cart button is disabled for sold-out items), and over-quantity limiting is
  * handled separately by {@link setQuantity} (Req 3.5).
  */
-export function addToCart(cart: Cart, item: FoodItem, addCheese = false): Cart {
+export function addToCart(
+  cart: Cart,
+  item: FoodItem,
+  addCheese = false,
+  jain = false
+): Cart {
   const existing = cart.find((line) => line.itemId === item.id);
   if (existing) {
     return cart.map((line) =>
@@ -77,6 +82,7 @@ export function addToCart(cart: Cart, item: FoodItem, addCheese = false): Cart {
   }
   const cheesePrice = cheesePriceOf(item);
   const withCheese = addCheese && cheesePrice > 0;
+  const withJain = jain && item.jainAvailable === true;
   return [
     ...cart,
     {
@@ -87,8 +93,23 @@ export function addToCart(cart: Cart, item: FoodItem, addCheese = false): Cart {
       availableQuantity: item.availableQuantity,
       ...(cheesePrice > 0 ? { cheesePrice } : {}),
       ...(withCheese ? { addCheese: true } : {}),
+      ...(withJain ? { jain: true } : {}),
     },
   ];
+}
+
+/**
+ * Toggle the Jain option on an existing cart line. No price change; no-op when
+ * the item is not in the cart.
+ */
+export function setJain(cart: Cart, itemId: string, jain: boolean): Cart {
+  return cart.map((line) => {
+    if (line.itemId !== itemId) return line;
+    const next: CartLine = { ...line };
+    if (jain) next.jain = true;
+    else delete next.jain;
+    return next;
+  });
 }
 
 /**
