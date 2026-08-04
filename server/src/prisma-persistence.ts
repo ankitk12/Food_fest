@@ -21,6 +21,22 @@ import type {
   PaymentMethod,
 } from "../../types/index.js";
 
+/**
+ * A single shared PrismaClient reused across (warm) serverless invocations.
+ *
+ * On Vercel each function instance stays warm between requests, so caching the
+ * client on `globalThis` prevents opening a brand-new connection pool on every
+ * request / hot reload — the usual cause of "too many connections" errors.
+ */
+const globalForPrisma = globalThis as unknown as { __bytebitesPrisma?: PrismaClient };
+
+function getSharedPrisma(): PrismaClient {
+  if (!globalForPrisma.__bytebitesPrisma) {
+    globalForPrisma.__bytebitesPrisma = new PrismaClient();
+  }
+  return globalForPrisma.__bytebitesPrisma;
+}
+
 export class PrismaPersistence implements PersistenceAdapter {
   private readonly prisma: PrismaClient;
   private latest: StoreSnapshot | null = null;
@@ -28,7 +44,7 @@ export class PrismaPersistence implements PersistenceAdapter {
   private writeChain: Promise<void> = Promise.resolve();
 
   constructor(prisma?: PrismaClient) {
-    this.prisma = prisma ?? new PrismaClient();
+    this.prisma = prisma ?? getSharedPrisma();
   }
 
   /**
