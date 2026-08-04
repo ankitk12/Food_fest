@@ -896,6 +896,44 @@ main.home {
   filter: brightness(1.05);
 }
 
+.combo-card-qty-controls {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.35rem;
+  border-radius: 10px;
+  background: rgba(255, 157, 28, 0.12);
+  border: 1px solid rgba(255, 157, 28, 0.5);
+}
+
+.combo-card-qty-btn {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffc65a, #ff9d1c);
+  color: #0b1712;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.combo-card-qty-btn:hover {
+  filter: brightness(1.05);
+}
+
+.combo-card-qty-value {
+  min-width: 1.5rem;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+}
+
 .food-card-jain-badge {
   display: inline-flex;
   align-items: center;

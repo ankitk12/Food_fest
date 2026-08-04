@@ -64,11 +64,17 @@ export function CustomerForm({
       return;
     }
 
+    // Name is required and cannot be blank/whitespace.
+    if (name.trim() === "") {
+      setError("Please enter your name.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const saved = await registerCustomer({
         mobile,
-        name,
+        name: name.trim(),
         ...(email.trim() ? { email: email.trim() } : {}),
       });
       setCustomer(saved);

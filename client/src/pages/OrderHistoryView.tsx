@@ -9,8 +9,9 @@
 
 import { useCallback } from "react";
 import { Link } from "react-router-dom";
-import { getCustomerOrders } from "../api/client.js";
+import { getCustomerOrders, getCombos, getAllItems } from "../api/client.js";
 import type { OrderResponse } from "../api/client.js";
+import type { Combo, FoodItem } from "../../../types/index.js";
 import { useCustomer } from "../customer/CustomerContext.js";
 import { usePolling } from "../hooks/usePolling.js";
 import { orderPath, ROUTES } from "../routes.js";
@@ -64,6 +65,25 @@ export function OrderHistoryView(): JSX.Element {
     fetchOrders,
     { enabled: !!customer, intervalMs: 60000 }
   );
+
+  // Live combos + menu, used to resolve a combo line's clubbed items for
+  // display (e.g. older orders that didn't store the item names).
+  const { data: combos } = usePolling<Combo[]>(useCallback(() => getCombos(), []));
+  const { data: menu } = usePolling<FoodItem[]>(useCallback(() => getAllItems(), []));
+  const combosById = new Map((combos ?? []).map((c) => [c.id, c]));
+  const itemNameById = new Map((menu ?? []).map((i) => [i.id, i.name]));
+
+  /** Resolve the clubbed item names for a combo order line. */
+  function comboItemsFor(item: OrderResponse["items"][number]): string[] {
+    if (item.comboItemNames && item.comboItemNames.length > 0) {
+      return item.comboItemNames;
+    }
+    const ids =
+      item.comboItemIds && item.comboItemIds.length > 0
+        ? item.comboItemIds
+        : combosById.get(item.itemId)?.itemIds ?? [];
+    return ids.map((id) => itemNameById.get(id) ?? id);
+  }
 
   if (!customer) {
     return (
@@ -135,12 +155,28 @@ export function OrderHistoryView(): JSX.Element {
                 </div>
 
                 <ul className="order-card-items">
-                  {order.items.map((item) => (
-                    <li key={item.itemId} className="order-card-item-line">
-                      <span className="order-card-item-name">{item.name}</span>
-                      <span className="order-card-item-qty">×{item.quantity}</span>
-                    </li>
-                  ))}
+                  {order.items.map((item) => {
+                    const comboNames = comboItemsFor(item);
+                    const isCombo =
+                      (item.comboItemIds && item.comboItemIds.length > 0) ||
+                      combosById.has(item.itemId);
+                    return (
+                      <li key={item.itemId} className="order-card-item-line">
+                        <span className="order-card-item-name">
+                          {isCombo && (
+                            <span className="cart-line-combo-tag">Combo</span>
+                          )}
+                          {item.name}
+                          {comboNames.length > 0 && (
+                            <span className="cart-line-combo-items">
+                              {comboNames.join(" + ")}
+                            </span>
+                          )}
+                        </span>
+                        <span className="order-card-item-qty">×{item.quantity}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
 
                 <div className="order-card-footer">

@@ -100,8 +100,13 @@ export function createApp(deps: AppDependencies): Express {
    * customerId mobile) so the admin views show a name alongside the number.
    * The name is an empty string when the customer has no registered name.
    */
-  const withCustomerName = (order: Order): Order & { customerName: string } => {
-    const customer = store.getCustomer(order.customerId);
+  const withCustomerName = async (
+    order: Order
+  ): Promise<Order & { customerName: string }> => {
+    // Read the customer directly from the DB (via the repo) rather than the
+    // in-memory store, so a name registered on another serverless instance is
+    // still resolved here.
+    const customer = await customerRepo.get(order.customerId);
     return { ...order, customerName: customer?.name ?? "" };
   };
 
@@ -178,8 +183,17 @@ export function createApp(deps: AppDependencies): Express {
       return;
     }
 
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (name === "") {
+      const errBody: ApiError = {
+        error: "Name is required",
+        code: "INVALID_NAME",
+      };
+      res.status(400).json(errBody);
+      return;
+    }
+
     const mobile = normalizeMobile(body.mobile);
-    const name = typeof body.name === "string" ? body.name : "";
     const email = typeof body.email === "string" ? body.email : undefined;
 
     const customer: Customer = { mobile, name, ...(email ? { email } : {}) };
@@ -549,7 +563,7 @@ export function createApp(deps: AppDependencies): Express {
     // descending order is chronological descending order.
     orders.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-    res.status(200).json(orders.map((o) => withCustomerName(o)));
+    res.status(200).json(await Promise.all(orders.map((o) => withCustomerName(o))));
   });
 
   // --- GET /api/admin/orders/:token ---------------------------------------
@@ -567,7 +581,7 @@ export function createApp(deps: AppDependencies): Express {
       res.status(404).json(errBody);
       return;
     }
-    res.status(200).json(withCustomerName(order));
+    res.status(200).json(await withCustomerName(order));
   });
 
   // --- GET /api/admin/items -----------------------------------------------

@@ -93,6 +93,8 @@ export function HomePage(): JSX.Element {
                 .filter((i): i is FoodItem => i !== undefined);
               const regularTotal = comboItems.reduce((sum, i) => sum + i.price, 0);
               const savings = regularTotal - combo.price;
+              const comboLine = cart.find((l) => l.comboId === combo.id);
+              const comboQty = comboLine?.quantity ?? 0;
               return (
                 <li key={combo.id}>
                   <article className="combo-card" data-testid={`combo-card-${combo.id}`}>
@@ -124,14 +126,48 @@ export function HomePage(): JSX.Element {
                           </>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        className="combo-card-add"
-                        data-testid={`combo-add-${combo.id}`}
-                        onClick={() => addCombo(combo, comboItems)}
-                      >
-                        Add Combo
-                      </button>
+                      {comboQty > 0 ? (
+                        <div
+                          className="combo-card-qty-controls"
+                          data-testid={`combo-qty-controls-${combo.id}`}
+                        >
+                          <button
+                            type="button"
+                            className="combo-card-qty-btn"
+                            aria-label={`Decrease ${combo.name}`}
+                            onClick={() =>
+                              comboQty <= 1
+                                ? removeItem(combo.id)
+                                : decrement(combo.id)
+                            }
+                          >
+                            −
+                          </button>
+                          <span
+                            className="combo-card-qty-value"
+                            data-testid={`combo-qty-${combo.id}`}
+                          >
+                            {comboQty}
+                          </span>
+                          <button
+                            type="button"
+                            className="combo-card-qty-btn"
+                            aria-label={`Increase ${combo.name}`}
+                            onClick={() => increment(combo.id)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="combo-card-add"
+                          data-testid={`combo-add-${combo.id}`}
+                          onClick={() => addCombo(combo, comboItems)}
+                        >
+                          Add Combo
+                        </button>
+                      )}
                     </div>
                   </article>
                 </li>

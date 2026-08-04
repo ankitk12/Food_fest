@@ -45,7 +45,7 @@ function itemsSummary(items: OrderResponse["items"]): string {
           i.comboItemNames && i.comboItemNames.length > 0
             ? ` [${i.comboItemNames.join(" + ")}]`
             : "";
-        return `${i.quantity}× 🍱 ${i.name} (Combo)${contents}`;
+        return `${i.quantity}× 🍱 ${i.name} ${contents}`;
       }
       return `${i.quantity}× ${i.name}${tags ? ` (${tags})` : ""}`;
     })
