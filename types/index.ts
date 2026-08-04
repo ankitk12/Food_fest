@@ -126,6 +126,12 @@ export interface Order {
   paid: boolean;
   paymentMethod: PaymentMethod;
   gatewayRef?: string;
+  /** Razorpay order id (from create-order), when paid online. */
+  razorpayOrderId?: string;
+  /** Razorpay payment id returned on a successful online payment. */
+  razorpayPaymentId?: string;
+  /** Razorpay signature verified server-side for the online payment. */
+  razorpaySignature?: string;
   customerId: string;
   createdAt: string; // ISO timestamp
   pointsUsed?: number; // FoodCoins (reward points) redeemed against this order at checkout

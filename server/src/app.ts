@@ -14,6 +14,7 @@
  */
 
 import express, { type Express, type Request, type Response } from "express";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type {
   CartItem,
   Customer,
@@ -77,6 +78,41 @@ function sortByDisplayOrder(items: FoodItem[]): FoodItem[] {
     if (ao !== bo) return ao - bo;
     return a.name.localeCompare(b.name);
   });
+}
+
+/**
+ * Parse a boolean-ish environment flag. Unset falls back to `defaultValue`;
+ * "false"/"0"/"no"/"off" (any case) are false; anything else is true.
+ */
+function envFlag(name: string, defaultValue: boolean): boolean {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return defaultValue;
+  return !["false", "0", "no", "off"].includes(raw.trim().toLowerCase());
+}
+
+/**
+ * Verify a Razorpay payment signature: HMAC-SHA256(orderId + "|" + paymentId)
+ * keyed with RAZORPAY_KEY_SECRET, compared (timing-safe) against the signature
+ * returned by Razorpay Checkout. Returns false if the secret is unset or any
+ * field is missing/mismatched. The KEY_SECRET is read from the environment and
+ * never leaves the server.
+ */
+function verifyRazorpaySignature(
+  orderId: string,
+  paymentId: string,
+  signature: string
+): boolean {
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keySecret || !orderId || !paymentId || !signature) return false;
+  const expected = createHmac("sha256", keySecret)
+    .update(`${orderId}|${paymentId}`)
+    .digest("hex");
+  const expectedBuf = Buffer.from(expected, "utf8");
+  const actualBuf = Buffer.from(signature, "utf8");
+  return (
+    expectedBuf.length === actualBuf.length &&
+    timingSafeEqual(expectedBuf, actualBuf)
+  );
 }
 
 /**
@@ -153,10 +189,159 @@ export function createApp(deps: AppDependencies): Express {
   // client. Currently exposes the merchant UPI identity used to build the
   // checkout QR / payment intent, with demo defaults when unset.
   app.get("/api/config", (_req: Request, res: Response): void => {
+    const razorpayKeyId = process.env.RAZORPAY_KEY_ID ?? "";
     res.status(200).json({
       merchantVpa: process.env.MERCHANT_VPA ?? "invest-a-bite@upi",
       merchantName: process.env.MERCHANT_NAME ?? "Invest-A-Bite",
+      // Public Razorpay key id (safe to expose); empty when the gateway is not
+      // configured, which the client uses to hide the online-pay option.
+      razorpayKeyId,
+      // Which payment methods to offer at checkout, toggled via env. Online pay
+      // additionally requires Razorpay to be configured (a key id present).
+      paymentOnlineEnabled:
+        envFlag("PAYMENT_ONLINE_ENABLED", true) && razorpayKeyId !== "",
+      paymentUpiEnabled: envFlag("PAYMENT_UPI_ENABLED", true),
+      paymentCashEnabled: envFlag("PAYMENT_CASH_ENABLED", true),
     });
+  });
+
+  // --- POST /api/create-order ---------------------------------------------
+  //
+  // Create a Razorpay order for the Standard Checkout flow. Accepts the amount
+  // in paise (>= 100), an optional currency (default INR) and receipt, calls
+  // the Razorpay Orders API with HTTP Basic auth (key id : key secret, read
+  // from the environment — the secret never reaches the client), and returns
+  // the order id + amount + currency + public key id for the checkout modal.
+  app.post("/api/create-order", async (req: Request, res: Response): Promise<void> => {
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keyId || !keySecret) {
+      res.status(500).json({
+        error: "Payment gateway is not configured",
+        code: "GATEWAY_NOT_CONFIGURED",
+      });
+      return;
+    }
+
+    const body = (req.body ?? {}) as {
+      amount?: unknown;
+      currency?: unknown;
+      receipt?: unknown;
+    };
+
+    const amount =
+      typeof body.amount === "number" && Number.isFinite(body.amount)
+        ? Math.round(body.amount)
+        : NaN;
+    if (!Number.isFinite(amount) || amount < 100) {
+      res.status(400).json({
+        error: "amount must be an integer of at least 100 paise",
+        code: "INVALID_AMOUNT",
+      });
+      return;
+    }
+
+    const currency =
+      typeof body.currency === "string" && body.currency.trim() !== ""
+        ? body.currency.trim()
+        : "INR";
+    const receipt =
+      typeof body.receipt === "string" && body.receipt.trim() !== ""
+        ? body.receipt.trim()
+        : `rcpt_${Date.now()}`;
+
+    try {
+      const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+      const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${auth}`,
+        },
+        body: JSON.stringify({ amount, currency, receipt }),
+      });
+
+      if (rzpRes.status === 401) {
+        res.status(401).json({
+          error: "Payment gateway authentication failed",
+          code: "GATEWAY_AUTH_FAILED",
+        });
+        return;
+      }
+      if (!rzpRes.ok) {
+        const detail = await rzpRes.text();
+        console.error("Razorpay create-order failed:", rzpRes.status, detail);
+        res.status(500).json({
+          error: "Failed to create payment order",
+          code: "GATEWAY_ERROR",
+        });
+        return;
+      }
+
+      const order = (await rzpRes.json()) as {
+        id: string;
+        amount: number;
+        currency: string;
+      };
+      res.status(201).json({
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId,
+      });
+    } catch (err) {
+      console.error("Razorpay create-order error:", err);
+      res.status(500).json({
+        error: "Failed to create payment order",
+        code: "GATEWAY_ERROR",
+      });
+    }
+  });
+
+  // --- POST /api/verify-payment -------------------------------------------
+  //
+  // Verify a Razorpay payment signature (HMAC-SHA256 of "orderId|paymentId"
+  // keyed with the secret). Returns { verified: true } only when the signature
+  // matches; a mismatch is 400 (never marks anything paid) and missing fields
+  // are 400. Order finalization (marking paid) happens in /api/checkout, which
+  // re-verifies authoritatively — this endpoint is the standalone verifier.
+  app.post("/api/verify-payment", (req: Request, res: Response): void => {
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      res.status(500).json({
+        error: "Payment gateway is not configured",
+        code: "GATEWAY_NOT_CONFIGURED",
+      });
+      return;
+    }
+    const body = (req.body ?? {}) as {
+      razorpay_order_id?: unknown;
+      razorpay_payment_id?: unknown;
+      razorpay_signature?: unknown;
+    };
+    const orderId =
+      typeof body.razorpay_order_id === "string" ? body.razorpay_order_id : "";
+    const paymentId =
+      typeof body.razorpay_payment_id === "string" ? body.razorpay_payment_id : "";
+    const signature =
+      typeof body.razorpay_signature === "string" ? body.razorpay_signature : "";
+
+    if (!orderId || !paymentId || !signature) {
+      res.status(400).json({
+        error: "Missing payment verification fields",
+        code: "MISSING_FIELDS",
+      });
+      return;
+    }
+
+    if (!verifyRazorpaySignature(orderId, paymentId, signature)) {
+      res.status(400).json({
+        error: "Payment signature verification failed",
+        code: "SIGNATURE_MISMATCH",
+      });
+      return;
+    }
+
+    res.status(200).json({ verified: true });
   });
 
   // --- POST /api/customers ------------------------------------------------
@@ -253,6 +438,9 @@ export function createApp(deps: AppDependencies): Express {
         floorNo?: unknown;
         pickupTime?: unknown;
         couponCode?: unknown;
+        razorpay_order_id?: unknown;
+        razorpay_payment_id?: unknown;
+        razorpay_signature?: unknown;
       };
 
       const items = Array.isArray(body.items) ? (body.items as CartItem[]) : [];
@@ -295,6 +483,27 @@ export function createApp(deps: AppDependencies): Express {
         };
         res.status(400).json(errBody);
         return;
+      }
+
+      // Razorpay (online) payment: when the client supplies the payment proof,
+      // the signature is verified server-side. A valid signature marks the
+      // order as paid; an invalid one is rejected (no order is created).
+      const rzpOrderId =
+        typeof body.razorpay_order_id === "string" ? body.razorpay_order_id : "";
+      const rzpPaymentId =
+        typeof body.razorpay_payment_id === "string" ? body.razorpay_payment_id : "";
+      const rzpSignature =
+        typeof body.razorpay_signature === "string" ? body.razorpay_signature : "";
+      const hasGatewayProof = rzpOrderId !== "" && rzpPaymentId !== "";
+      if (hasGatewayProof) {
+        if (!verifyRazorpaySignature(rzpOrderId, rzpPaymentId, rzpSignature)) {
+          const errBody: ApiError = {
+            error: "Payment signature verification failed",
+            code: "PAYMENT_VERIFICATION_FAILED",
+          };
+          res.status(400).json(errBody);
+          return;
+        }
       }
 
       // Desk delivery requires a location and floor number.
@@ -383,8 +592,18 @@ export function createApp(deps: AppDependencies): Express {
         items,
         total,
         status: "Craving Funded",
-        paid: false,
+        // A verified Razorpay payment marks the order paid immediately; cash /
+        // manual-UPI orders stay pending until staff confirm receipt.
+        paid: hasGatewayProof,
         paymentMethod: payWithCash ? "cash" : "UPI",
+        ...(hasGatewayProof
+          ? {
+              gatewayRef: rzpPaymentId,
+              razorpayOrderId: rzpOrderId,
+              razorpayPaymentId: rzpPaymentId,
+              razorpaySignature: rzpSignature,
+            }
+          : {}),
         customerId,
         createdAt: new Date().toISOString(),
         pointsUsed,

@@ -7,7 +7,14 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ApiClientError, checkout, getConfig, getCoupons } from "../api/client.js";
+import {
+  ApiClientError,
+  checkout,
+  getConfig,
+  getCoupons,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+} from "../api/client.js";
 import type { CheckoutResponse } from "../api/client.js";
 import type { Coupon } from "../../../types/index.js";
 import { useCart } from "../cart/CartContext.js";
@@ -39,6 +46,34 @@ const DEFAULT_MERCHANT: MerchantConfig = {
 interface MerchantConfig {
   vpa: string;
   name: string;
+}
+
+/** Minimal shapes for the Razorpay Standard Checkout global (checkout.js). */
+interface RazorpaySuccess {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description?: string;
+  order_id: string;
+  prefill?: { name?: string; contact?: string; email?: string };
+  theme?: { color?: string };
+  handler?: (response: RazorpaySuccess) => void;
+  modal?: { ondismiss?: () => void };
+}
+interface RazorpayInstance {
+  open: () => void;
+  on: (event: "payment.failed", cb: (resp: { error?: { description?: string } }) => void) => void;
+}
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+  }
 }
 
 /** Build the shared UPI intent query string (pa, pn, am, cu, tn). */
@@ -99,6 +134,18 @@ export function CheckoutView(): JSX.Element {
   const [showUpi, setShowUpi] = useState(false);
   // Merchant UPI identity, loaded from the server's runtime config.
   const [merchant, setMerchant] = useState<MerchantConfig>(DEFAULT_MERCHANT);
+  // Public Razorpay key id. Prefer the server config (no rebuild needed); fall
+  // back to the Vite build-time env var VITE_RAZORPAY_KEY_ID.
+  const viteRazorpayKey =
+    (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+      ?.VITE_RAZORPAY_KEY_ID ?? "";
+  const [razorpayKeyId, setRazorpayKeyId] = useState(viteRazorpayKey);
+  // Which payment methods to offer, driven by server env (via /api/config).
+  const [payMethods, setPayMethods] = useState({
+    online: false,
+    upi: true,
+    cash: true,
+  });
   // Delivery: collect at stall (default) or deliver to a desk (needs location).
   const [deliveryType, setDeliveryType] = useState<"stall" | "desk">("stall");
   const [deskLocation, setDeskLocation] = useState("");
@@ -108,7 +155,15 @@ export function CheckoutView(): JSX.Element {
 
   useEffect(() => {
     getConfig()
-      .then((cfg) => setMerchant({ vpa: cfg.merchantVpa, name: cfg.merchantName }))
+      .then((cfg) => {
+        setMerchant({ vpa: cfg.merchantVpa, name: cfg.merchantName });
+        setRazorpayKeyId(cfg.razorpayKeyId || viteRazorpayKey);
+        setPayMethods({
+          online: cfg.paymentOnlineEnabled ?? false,
+          upi: cfg.paymentUpiEnabled ?? true,
+          cash: cfg.paymentCashEnabled ?? true,
+        });
+      })
       .catch(() => setMerchant(DEFAULT_MERCHANT));
   }, []);
 
@@ -208,6 +263,110 @@ export function CheckoutView(): JSX.Element {
             : "Payment failed. Your cart is safe — please try again.";
       }
       setState({ status: "failed", message });
+    }
+  }
+
+  /**
+   * Online payment via Razorpay Standard Checkout: create a Razorpay order for
+   * the amount due, open the modal, and on success verify the signature and
+   * finalize the order (server marks it paid only after verifying the
+   * signature again). Modal dismiss / payment failure surface an error and
+   * create no order.
+   */
+  async function handleRazorpay(): Promise<void> {
+    if (!customer || !deliveryValid) return;
+    if (!window.Razorpay) {
+      setState({
+        status: "failed",
+        message: "Payment library failed to load. Please refresh and try again.",
+      });
+      return;
+    }
+    const amountPaise = Math.round(amountToPay * 100);
+    if (amountPaise < 100) {
+      setState({ status: "failed", message: "Order amount is too low for online payment." });
+      return;
+    }
+
+    setState({ status: "paying" });
+    try {
+      const rzpOrder = await createRazorpayOrder({
+        amount: amountPaise,
+        receipt: `${customer.mobile}-${Date.now()}`,
+      });
+
+      const options: RazorpayOptions = {
+        key: rzpOrder.keyId || razorpayKeyId,
+        amount: rzpOrder.amount,
+        currency: rzpOrder.currency,
+        name: merchant.name,
+        description: "Invest-A-Bite order",
+        order_id: rzpOrder.orderId,
+        prefill: { name: customer.name, contact: customer.mobile },
+        theme: { color: "#ff9d1c" },
+        handler: (resp: RazorpaySuccess) => {
+          void (async () => {
+            try {
+              // Verify signature (standalone endpoint), then finalize the
+              // order — the server re-verifies before marking it paid.
+              const verified = await verifyRazorpayPayment({
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+              });
+              if (!verified.verified) {
+                setState({ status: "failed", message: "Payment could not be verified." });
+                return;
+              }
+              const result = await checkout({
+                stallId: DEMO_STALL_ID,
+                customerId: customer.mobile,
+                items: toCartItems(cart),
+                paymentMethod: "UPI",
+                deliveryType,
+                ...(deliveryType === "desk"
+                  ? { deskLocation: deskLocation.trim(), floorNo: floorNo.trim() }
+                  : {}),
+                ...(pickupTime.trim() ? { pickupTime: pickupTime.trim() } : {}),
+                ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+              });
+              clearCart();
+              setState({ status: "success", result, mobile: customer.mobile, method: "UPI" });
+              navigate(ROUTES.orderHistory);
+            } catch (err: unknown) {
+              setState({
+                status: "failed",
+                message:
+                  err instanceof Error
+                    ? err.message
+                    : "We couldn't confirm your payment. If money was deducted, contact staff.",
+              });
+            }
+          })();
+        },
+        modal: {
+          // User dismissed the modal without paying — no order is created.
+          ondismiss: () => setState({ status: "idle" }),
+        },
+      };
+
+      const rz = new window.Razorpay(options);
+      rz.on("payment.failed", (resp) => {
+        setState({
+          status: "failed",
+          message: resp.error?.description ?? "Payment failed. Please try again.",
+        });
+      });
+      rz.open();
+    } catch (err: unknown) {
+      setState({
+        status: "failed",
+        message:
+          err instanceof Error ? err.message : "Could not start the payment. Please try again.",
+      });
     }
   }
 
@@ -497,22 +656,44 @@ export function CheckoutView(): JSX.Element {
       ) : (
         <fieldset className="checkout-pay-methods" data-testid="checkout-pay-methods">
           <legend>Choose how to pay</legend>
-          <button
-            type="button"
-            className="checkout-pay checkout-pay--upi"
-            onClick={() => setShowUpi(true)}
-            disabled={state.status === "paying" || !deliveryValid}
-          >
-            Pay with UPI
-          </button>
-          <button
-            type="button"
-            className="checkout-pay checkout-pay--cash"
-            onClick={() => void handlePay("cash")}
-            disabled={state.status === "paying" || !deliveryValid}
-          >
-            {state.status === "paying" ? "Processing…" : "Pay with Cash"}
-          </button>
+          {payMethods.online && razorpayKeyId && (
+            <button
+              type="button"
+              className="checkout-pay checkout-pay--razorpay"
+              data-testid="checkout-pay-razorpay"
+              onClick={() => void handleRazorpay()}
+              disabled={state.status === "paying" || !deliveryValid}
+            >
+              {state.status === "paying"
+                ? "Processing…"
+                : "Pay Online (Card / UPI / Wallet)"}
+            </button>
+          )}
+          {payMethods.upi && (
+            <button
+              type="button"
+              className="checkout-pay checkout-pay--upi"
+              onClick={() => setShowUpi(true)}
+              disabled={state.status === "paying" || !deliveryValid}
+            >
+              Pay with UPI
+            </button>
+          )}
+          {payMethods.cash && (
+            <button
+              type="button"
+              className="checkout-pay checkout-pay--cash"
+              onClick={() => void handlePay("cash")}
+              disabled={state.status === "paying" || !deliveryValid}
+            >
+              {state.status === "paying" ? "Processing…" : "Pay with Cash"}
+            </button>
+          )}
+          {!payMethods.online && !payMethods.upi && !payMethods.cash && (
+            <p className="checkout-desk-hint" role="note">
+              No payment methods are currently available. Please contact staff.
+            </p>
+          )}
         </fieldset>
       )}
     </main>

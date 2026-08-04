@@ -46,6 +46,9 @@ model Order {
   paid          Boolean
   paymentMethod String
   gatewayRef    String?
+  razorpayOrderId     String?
+  razorpayPaymentId   String?
+  razorpaySignature   String?
   customerId    String
   createdAt     String
   pointsUsed    Int?

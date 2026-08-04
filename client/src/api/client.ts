@@ -80,6 +80,12 @@ export interface CheckoutRequest {
   pickupTime?: string;
   /** Coupon code to apply for a percentage discount (e.g. "SAVE10"). */
   couponCode?: string;
+  /** Razorpay order id from create-order (present for verified online payments). */
+  razorpay_order_id?: string;
+  /** Razorpay payment id returned by the checkout modal on success. */
+  razorpay_payment_id?: string;
+  /** Razorpay signature returned by the checkout modal; verified server-side. */
+  razorpay_signature?: string;
 }
 
 export interface CheckoutResponse {
@@ -109,6 +115,9 @@ export interface OrderResponse {
   paid: boolean;
   paymentMethod: "UPI" | "cash" | "other";
   gatewayRef?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
   customerId: string;
   /** The customer's registered name (empty string when unknown). */
   customerName?: string;
@@ -177,6 +186,14 @@ export interface AppConfig {
   merchantVpa: string;
   /** Merchant display name shown in the UPI payment intent / QR. */
   merchantName: string;
+  /** Public Razorpay key id; empty string when the gateway is not configured. */
+  razorpayKeyId?: string;
+  /** Whether the "Pay Online" (Razorpay) method is offered at checkout. */
+  paymentOnlineEnabled?: boolean;
+  /** Whether the "Pay with UPI" (QR) method is offered at checkout. */
+  paymentUpiEnabled?: boolean;
+  /** Whether the "Pay with Cash" method is offered at checkout. */
+  paymentCashEnabled?: boolean;
 }
 
 /** GET /api/config — non-secret runtime config (e.g. merchant UPI identity). */
@@ -187,6 +204,35 @@ export function getConfig(): Promise<AppConfig> {
 /** POST /api/checkout — initiate payment and create an order on success. */
 export function checkout(req: CheckoutRequest): Promise<CheckoutResponse> {
   return postJson<CheckoutResponse>("/checkout", req);
+}
+
+// --- Razorpay online payment ----------------------------------------------
+
+/** Response from POST /api/create-order. */
+export interface CreateRazorpayOrderResponse {
+  orderId: string;
+  amount: number;
+  currency: string;
+  /** Public Razorpay key id used to open the checkout modal. */
+  keyId: string;
+}
+
+/** POST /api/create-order — create a Razorpay order for `amount` (paise). */
+export function createRazorpayOrder(req: {
+  amount: number;
+  currency?: string;
+  receipt?: string;
+}): Promise<CreateRazorpayOrderResponse> {
+  return postJson<CreateRazorpayOrderResponse>("/create-order", req);
+}
+
+/** POST /api/verify-payment — verify the Razorpay signature (server-side). */
+export function verifyRazorpayPayment(req: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}): Promise<{ verified: boolean }> {
+  return postJson<{ verified: boolean }>("/verify-payment", req);
 }
 
 /**

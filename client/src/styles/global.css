@@ -1654,6 +1654,13 @@ main.home {
   color: var(--ia-text);
 }
 
+.checkout-pay--razorpay {
+  background: linear-gradient(135deg, #ffc65a, #ff9d1c);
+  border: none;
+  color: #0b1712;
+  font-weight: 700;
+}
+
 .checkout-pay:disabled {
   opacity: 0.6;
   cursor: default;

@@ -273,6 +273,9 @@ interface OrderRow {
   paid: boolean;
   paymentMethod: string;
   gatewayRef: string | null;
+  razorpayOrderId: string | null;
+  razorpayPaymentId: string | null;
+  razorpaySignature: string | null;
   customerId: string;
   createdAt: string;
   pointsUsed: number | null;
@@ -294,6 +297,9 @@ function orderToRow(o: Order): Prisma.OrderCreateManyInput {
     paid: o.paid,
     paymentMethod: o.paymentMethod,
     gatewayRef: o.gatewayRef ?? null,
+    razorpayOrderId: o.razorpayOrderId ?? null,
+    razorpayPaymentId: o.razorpayPaymentId ?? null,
+    razorpaySignature: o.razorpaySignature ?? null,
     customerId: o.customerId,
     createdAt: o.createdAt,
     pointsUsed: o.pointsUsed ?? null,
@@ -316,6 +322,9 @@ function rowToOrder(row: OrderRow): Order {
     paid: row.paid,
     paymentMethod: row.paymentMethod as PaymentMethod,
     ...(row.gatewayRef ? { gatewayRef: row.gatewayRef } : {}),
+    ...(row.razorpayOrderId ? { razorpayOrderId: row.razorpayOrderId } : {}),
+    ...(row.razorpayPaymentId ? { razorpayPaymentId: row.razorpayPaymentId } : {}),
+    ...(row.razorpaySignature ? { razorpaySignature: row.razorpaySignature } : {}),
     customerId: row.customerId,
     createdAt: row.createdAt,
     ...(row.pointsUsed !== null ? { pointsUsed: row.pointsUsed } : {}),
