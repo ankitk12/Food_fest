@@ -78,6 +78,18 @@ model FoodItem {
   price             Float
   stallId           String
   cheesePrice       Float?
+  addonName         String?
   jainAvailable     Boolean?
   displayOrder      Int?
+}
+
+/// A combo bundle: a set of food items clubbed together and sold at a single
+/// combo price. `itemIds` references FoodItem ids (stored as a string array).
+model Combo {
+  id       String   @id
+  name     String
+  itemIds  String[]
+  price    Float
+  active   Boolean  @default(true)
+  imageUrl String?
 }

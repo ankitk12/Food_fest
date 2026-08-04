@@ -17,10 +17,13 @@ import {
   getAdminCoupons,
   createAdminCoupon,
   deleteAdminCoupon,
+  getAdminCombos,
+  createAdminCombo,
+  deleteAdminCombo,
   type CreateItemRequest,
   type UpdateItemRequest,
 } from "../api/client.js";
-import type { Coupon, FoodItem } from "../../../types/index.js";
+import type { Combo, Coupon, FoodItem } from "../../../types/index.js";
 import { useCustomer } from "../customer/CustomerContext.js";
 import { usePolling } from "../hooks/usePolling.js";
 import { ADMIN_MOBILE } from "../constants.js";
@@ -138,6 +141,8 @@ function StockPanel(): JSX.Element {
       )}
 
       <CouponPanel />
+
+      <ComboPanel items={items ?? []} />
     </main>
   );
 }
@@ -804,6 +809,199 @@ function CouponPanel(): JSX.Element {
               className="stock-card-btn stock-card-btn--delete"
               onClick={() => void handleDelete(c.code)}
               data-testid={`coupon-delete-${c.code}`}
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// --- Combo Management Panel ------------------------------------------------
+
+interface ComboPanelProps {
+  /** The current catalogue items, offered as combo ingredients. */
+  items: FoodItem[];
+}
+
+/**
+ * Admin panel to create combos by clubbing two or more items together at a
+ * single combo price. Lists existing combos and allows deleting them.
+ */
+function ComboPanel({ items }: ComboPanelProps): JSX.Element {
+  const [combos, setCombos] = useState<Combo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [price, setPrice] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const itemsById = new Map(items.map((i) => [i.id, i]));
+  const selectedTotal = selectedIds.reduce(
+    (sum, id) => sum + (itemsById.get(id)?.price ?? 0),
+    0
+  );
+
+  async function fetchCombos(): Promise<void> {
+    try {
+      setCombos(await getAdminCombos());
+    } catch {
+      setError("Failed to load combos.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void fetchCombos(); }, []);
+
+  function toggleItem(id: string): void {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
+    );
+  }
+
+  async function handleCreate(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    setCreateError(null);
+    const priceValue = parseFloat(price);
+    if (!name.trim()) {
+      setCreateError("Please enter a combo name.");
+      return;
+    }
+    if (selectedIds.length < 2) {
+      setCreateError("Select at least two items to club into a combo.");
+      return;
+    }
+    if (isNaN(priceValue) || priceValue <= 0) {
+      setCreateError("Please enter a valid combo price.");
+      return;
+    }
+    setCreating(true);
+    try {
+      await createAdminCombo({
+        name: name.trim(),
+        itemIds: selectedIds,
+        price: priceValue,
+        ...(imageUrl.trim() ? { imageUrl: imageUrl.trim() } : {}),
+      });
+      setName("");
+      setSelectedIds([]);
+      setPrice("");
+      setImageUrl("");
+      await fetchCombos();
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create combo.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleDelete(id: string): Promise<void> {
+    if (!window.confirm("Delete this combo?")) return;
+    try {
+      await deleteAdminCombo(id);
+      await fetchCombos();
+    } catch {
+      setError("Failed to delete combo.");
+    }
+  }
+
+  return (
+    <section className="admin-coupon-panel" data-testid="combo-panel">
+      <h2 className="admin-section-title">Combo Management</h2>
+
+      <form className="admin-coupon-form" onSubmit={(e) => void handleCreate(e)}>
+        <h3 className="admin-coupon-form-title">Create New Combo</h3>
+
+        <div className="admin-coupon-form-fields">
+          <label className="admin-coupon-field">
+            <span>Combo Name</span>
+            <input
+              type="text"
+              placeholder="e.g. Momos + Mojito"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              data-testid="combo-name-input"
+              required
+            />
+          </label>
+          <label className="admin-coupon-field">
+            <span>Combo Price (₹)</span>
+            <input
+              type="number"
+              placeholder="e.g. 100"
+              value={price}
+              min={1}
+              onChange={(e) => setPrice(e.target.value)}
+              data-testid="combo-price-input"
+              required
+            />
+          </label>
+          <label className="admin-coupon-field">
+            <span>Image URL (optional)</span>
+            <input
+              type="url"
+              placeholder="https://…"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              data-testid="combo-image-input"
+            />
+          </label>
+        </div>
+
+        <div className="combo-item-picker">
+          <span className="combo-item-picker-label">
+            Club items ({selectedIds.length} selected · regular {formatINR(selectedTotal)})
+          </span>
+          <div className="combo-item-picker-grid">
+            {items.map((item) => (
+              <label
+                key={item.id}
+                className={`combo-item-chip${selectedIds.includes(item.id) ? " combo-item-chip--on" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(item.id)}
+                  onChange={() => toggleItem(item.id)}
+                  data-testid={`combo-item-${item.id}`}
+                />
+                <span>{item.name} · {formatINR(item.price)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {createError && <p className="admin-error" role="alert">{createError}</p>}
+        <button type="submit" className="admin-coupon-submit" disabled={creating}>
+          {creating ? "Creating…" : "Create Combo"}
+        </button>
+      </form>
+
+      <div className="admin-coupon-list">
+        {loading && <p role="status">Loading combos…</p>}
+        {error && <p className="admin-error" role="alert">{error}</p>}
+        {!loading && combos.length === 0 && <p className="admin-empty">No combos yet.</p>}
+        {combos.map((combo) => (
+          <div key={combo.id} className="admin-coupon-row" data-testid={`combo-row-${combo.id}`}>
+            <div className="admin-coupon-info">
+              <strong className="admin-coupon-code">{combo.name}</strong>
+              <span className="admin-coupon-meta">
+                {combo.itemIds
+                  .map((id) => itemsById.get(id)?.name ?? id)
+                  .join(" + ")}{" "}
+                · {formatINR(combo.price)}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="stock-card-btn stock-card-btn--delete"
+              onClick={() => void handleDelete(combo.id)}
+              data-testid={`combo-delete-${combo.id}`}
             >
               Delete
             </button>

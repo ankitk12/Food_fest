@@ -24,6 +24,7 @@
 
 import type {
   CartItem,
+  Combo,
   Coupon,
   Customer,
   FoodItem,
@@ -140,6 +141,7 @@ export class Store {
   private wallets: Map<string, Wallet> = new Map();
   private customers: Map<string, Customer> = new Map();
   private coupons: Map<string, Coupon> = new Map();
+  private combos: Map<string, Combo> = new Map();
 
   /**
    * Ids of food items created at runtime (not part of the seed catalogue), so
@@ -212,6 +214,10 @@ export class Store {
       for (const coupon of snapshot.coupons ?? []) {
         this.coupons.set(coupon.code, coupon);
       }
+      // Restore persisted combos created by the admin.
+      for (const combo of snapshot.combos ?? []) {
+        this.combos.set(combo.id, combo);
+      }
       for (const [itemId, quantity] of Object.entries(
         snapshot.itemQuantities
       )) {
@@ -238,6 +244,7 @@ export class Store {
       wallets: Array.from(this.wallets.values()).map((w) => deepClone(w)),
       customers: this.getCustomers(),
       coupons: Array.from(this.coupons.values()).map((c) => deepClone(c)),
+      combos: Array.from(this.combos.values()).map((c) => deepClone(c)),
       itemQuantities: Object.fromEntries(
         Array.from(this.foodItems.values()).map((i) => [
           i.id,
@@ -280,6 +287,7 @@ export class Store {
     this.wallets.clear();
     this.customers.clear();
     this.coupons.clear();
+    this.combos.clear();
     this.customItemIds.clear();
     this.deletedItemIds.clear();
 
@@ -537,6 +545,31 @@ export class Store {
   /** Remove a coupon by code. No-op when unknown. */
   deleteCoupon(code: string): void {
     this.coupons.delete(code.toUpperCase());
+    this.persist();
+  }
+
+  // --- Combos ---------------------------------------------------------------
+
+  /** All combos (defensive copies). */
+  getCombos(): Combo[] {
+    return Array.from(this.combos.values()).map((c) => deepClone(c));
+  }
+
+  /** A single combo by id, or undefined when unknown. */
+  getCombo(id: string): Combo | undefined {
+    const combo = this.combos.get(id);
+    return combo ? deepClone(combo) : undefined;
+  }
+
+  /** Insert or replace a combo. */
+  saveCombo(combo: Combo): void {
+    this.combos.set(combo.id, deepClone(combo));
+    this.persist();
+  }
+
+  /** Remove a combo by id. No-op when unknown. */
+  deleteCombo(id: string): void {
+    this.combos.delete(id);
     this.persist();
   }
 }

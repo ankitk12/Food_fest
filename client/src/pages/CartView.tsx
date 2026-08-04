@@ -47,11 +47,17 @@ export function CartView(): JSX.Element {
             data-testid={`cart-line-${line.itemId}`}
           >
             <span className="cart-line-name">
+              {line.comboId && <span className="cart-line-combo-tag">Combo</span>}
               {line.name}
               {line.addCheese && (
                 <span className="cart-line-addon"> + Cheese</span>
               )}
               {line.jain && <span className="cart-line-addon"> · Jain</span>}
+              {line.comboItemNames && line.comboItemNames.length > 0 && (
+                <span className="cart-line-combo-items">
+                  {line.comboItemNames.join(" + ")}
+                </span>
+              )}
             </span>
             <span className="cart-line-unit-price">
               {formatINR(line.unitPrice)}

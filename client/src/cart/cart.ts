@@ -98,6 +98,54 @@ export function addToCart(
   ];
 }
 
+/** Minimal shape of a combo needed to add it to the cart. */
+export interface ComboInput {
+  id: string;
+  name: string;
+  price: number;
+  itemIds: string[];
+}
+
+/**
+ * Add a combo to the cart as a single independent line (one combo unit), at
+ * the combo `price`. It does NOT touch the individual item lines. Adding the
+ * same combo again just increments its quantity. `items` are the resolved
+ * clubbed food items, used to record their names and to cap the combo's
+ * available quantity at the least-stocked ingredient.
+ */
+export function addComboToCart(
+  cart: Cart,
+  combo: ComboInput,
+  items: FoodItem[]
+): Cart {
+  const availableQuantity =
+    items.length > 0
+      ? Math.min(...items.map((i) => i.availableQuantity))
+      : 0;
+
+  const existing = cart.find((line) => line.comboId === combo.id);
+  if (existing) {
+    return cart.map((line) =>
+      line.comboId === combo.id
+        ? { ...line, quantity: line.quantity + 1, availableQuantity }
+        : line
+    );
+  }
+  return [
+    ...cart,
+    {
+      itemId: combo.id,
+      name: combo.name,
+      unitPrice: combo.price,
+      quantity: 1,
+      availableQuantity,
+      comboId: combo.id,
+      comboItemIds: combo.itemIds,
+      comboItemNames: items.map((i) => i.name),
+    },
+  ];
+}
+
 /**
  * Toggle the Jain option on an existing cart line. No price change; no-op when
  * the item is not in the cart.
@@ -185,10 +233,19 @@ export function cartItemCount(cart: Cart): number {
 
 /** Project the cart to plain `CartItem`s for the checkout request payload. */
 export function toCartItems(cart: Cart): CartItem[] {
-  return cart.map(({ itemId, name, unitPrice, quantity }) => ({
-    itemId,
-    name,
-    unitPrice,
-    quantity,
+  return cart.map((line) => ({
+    itemId: line.itemId,
+    name: line.name,
+    unitPrice: line.unitPrice,
+    quantity: line.quantity,
+    ...(line.addCheese ? { addCheese: true } : {}),
+    ...(line.jain ? { jain: true } : {}),
+    ...(line.comboId
+      ? {
+          comboId: line.comboId,
+          comboItemIds: line.comboItemIds ?? [],
+          comboItemNames: line.comboItemNames ?? [],
+        }
+      : {}),
   }));
 }

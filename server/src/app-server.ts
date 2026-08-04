@@ -25,6 +25,7 @@ async function buildBackend(): Promise<{
   walletRepo?: import("./repos.js").WalletRepo;
   foodItemRepo?: import("./repos.js").FoodItemRepo;
   couponRepo?: import("./repos.js").CouponRepo;
+  comboRepo?: import("./repos.js").ComboRepo;
 }> {
   if (process.env.DATABASE_URL) {
     const { PrismaPersistence } = await import("./prisma-persistence.js");
@@ -47,6 +48,7 @@ async function buildBackend(): Promise<{
       walletRepo: persistence.createWalletRepo(),
       foodItemRepo: persistence.createFoodItemRepo(),
       couponRepo: persistence.createCouponRepo(),
+      comboRepo: persistence.createComboRepo(),
     };
   }
 
@@ -58,7 +60,7 @@ async function buildBackend(): Promise<{
   return { store };
 }
 
-const { store, orderRepo, customerRepo, walletRepo, foodItemRepo, couponRepo } =
+const { store, orderRepo, customerRepo, walletRepo, foodItemRepo, couponRepo, comboRepo } =
   await buildBackend();
 
 const app = createApp({
@@ -68,6 +70,7 @@ const app = createApp({
   ...(walletRepo ? { walletRepo } : {}),
   ...(foodItemRepo ? { foodItemRepo } : {}),
   ...(couponRepo ? { couponRepo } : {}),
+  ...(comboRepo ? { comboRepo } : {}),
 });
 
 export default app;

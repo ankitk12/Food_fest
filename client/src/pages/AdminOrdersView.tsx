@@ -36,9 +36,17 @@ function itemsSummary(items: OrderResponse["items"]): string {
   if (items.length === 0) return "—";
   return items
     .map((i) => {
+      const isCombo = i.comboItemIds && i.comboItemIds.length > 0;
       const tags = [i.addCheese ? "+Cheese" : "", i.jain ? "Jain" : ""]
         .filter(Boolean)
         .join(", ");
+      if (isCombo) {
+        const contents =
+          i.comboItemNames && i.comboItemNames.length > 0
+            ? ` [${i.comboItemNames.join(" + ")}]`
+            : "";
+        return `${i.quantity}× 🍱 ${i.name} (Combo)${contents}`;
+      }
       return `${i.quantity}× ${i.name}${tags ? ` (${tags})` : ""}`;
     })
     .join(", ");

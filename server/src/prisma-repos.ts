@@ -9,8 +9,8 @@
  */
 
 import type { PrismaClient } from "@prisma/client";
-import type { Coupon, Customer, FoodItem, Wallet } from "../../types/index.js";
-import type { CouponRepo, CustomerRepo, FoodItemRepo, WalletRepo } from "./repos.js";
+import type { Combo, Coupon, Customer, FoodItem, Wallet } from "../../types/index.js";
+import type { ComboRepo, CouponRepo, CustomerRepo, FoodItemRepo, WalletRepo } from "./repos.js";
 
 // --- Row <-> Domain Helpers ------------------------------------------------
 
@@ -24,6 +24,7 @@ function rowToFoodItem(row: {
   price: number;
   stallId: string;
   cheesePrice?: number | null;
+  addonName?: string | null;
   jainAvailable?: boolean | null;
   displayOrder?: number | null;
 }): FoodItem {
@@ -37,6 +38,7 @@ function rowToFoodItem(row: {
     price: row.price,
     stallId: row.stallId,
     ...(row.cheesePrice != null ? { cheesePrice: row.cheesePrice } : {}),
+    ...(row.addonName ? { addonName: row.addonName } : {}),
     ...(row.jainAvailable != null ? { jainAvailable: row.jainAvailable } : {}),
     ...(row.displayOrder != null ? { displayOrder: row.displayOrder } : {}),
   };
@@ -217,4 +219,57 @@ export class PrismaCouponRepo implements CouponRepo {
       where: { code: code.toUpperCase() },
     });
   }
+}
+
+// --- Prisma Combo Repository -----------------------------------------------
+
+export class PrismaComboRepo implements ComboRepo {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async list(): Promise<Combo[]> {
+    const rows = await this.prisma.combo.findMany();
+    return rows.map((r) => rowToCombo(r));
+  }
+
+  async get(id: string): Promise<Combo | undefined> {
+    const row = await this.prisma.combo.findUnique({ where: { id } });
+    return row ? rowToCombo(row) : undefined;
+  }
+
+  async save(combo: Combo): Promise<void> {
+    const data = {
+      name: combo.name,
+      itemIds: combo.itemIds,
+      price: combo.price,
+      active: combo.active,
+      imageUrl: combo.imageUrl ?? null,
+    };
+    await this.prisma.combo.upsert({
+      where: { id: combo.id },
+      create: { id: combo.id, ...data },
+      update: data,
+    });
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.prisma.combo.deleteMany({ where: { id } });
+  }
+}
+
+function rowToCombo(row: {
+  id: string;
+  name: string;
+  itemIds: string[];
+  price: number;
+  active: boolean;
+  imageUrl?: string | null;
+}): Combo {
+  return {
+    id: row.id,
+    name: row.name,
+    itemIds: row.itemIds,
+    price: row.price,
+    active: row.active,
+    ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
+  };
 }

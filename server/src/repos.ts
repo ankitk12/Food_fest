@@ -7,7 +7,7 @@
  *   - Prisma*Repo: direct Prisma database queries (see prisma-repos.ts)
  */
 
-import type { Coupon, Customer, FoodItem, Wallet } from "../../types/index.js";
+import type { Combo, Coupon, Customer, FoodItem, Wallet } from "../../types/index.js";
 import type { Store } from "./store.js";
 
 // --- Customer Repository ---------------------------------------------------
@@ -137,5 +137,34 @@ export class StoreCouponRepo implements CouponRepo {
 
   async delete(code: string): Promise<void> {
     this.store.deleteCoupon(code);
+  }
+}
+
+// --- Combo Repository ------------------------------------------------------
+
+export interface ComboRepo {
+  list(): Promise<Combo[]>;
+  get(id: string): Promise<Combo | undefined>;
+  save(combo: Combo): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
+export class StoreComboRepo implements ComboRepo {
+  constructor(private readonly store: Store) {}
+
+  async list(): Promise<Combo[]> {
+    return this.store.getCombos();
+  }
+
+  async get(id: string): Promise<Combo | undefined> {
+    return this.store.getCombo(id);
+  }
+
+  async save(combo: Combo): Promise<void> {
+    this.store.saveCombo(combo);
+  }
+
+  async delete(id: string): Promise<void> {
+    this.store.deleteCombo(id);
   }
 }

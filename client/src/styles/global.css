@@ -716,6 +716,158 @@ main.home {
   gap: 0.5rem;
 }
 
+.cart-line-combo-tag {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 157, 28, 0.16);
+  border: 1px solid rgba(255, 157, 28, 0.6);
+  color: #ff9d1c;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.cart-line-combo-items {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--ia-text-muted);
+  margin-top: 0.15rem;
+}
+
+.combo-item-picker {
+  margin-top: 0.75rem;
+}
+
+.combo-item-picker-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--ia-text-muted);
+}
+
+.combo-item-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.combo-item-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.combo-item-chip--on {
+  border-color: rgba(255, 157, 28, 0.7);
+  background: rgba(255, 157, 28, 0.16);
+  color: #ffc65a;
+}
+
+.combo-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.combo-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(255, 198, 90, 0.1), rgba(255, 157, 28, 0.06));
+  border: 1px solid rgba(255, 157, 28, 0.45);
+}
+
+.combo-card-image {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+}
+
+.combo-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem;
+  flex: 1;
+}
+
+.combo-card-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffc65a;
+}
+
+.combo-card-items {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ia-text-muted);
+  flex: 1;
+}
+
+.combo-card-pricing {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.combo-card-price {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.combo-card-strike {
+  font-size: 0.9rem;
+  color: var(--ia-text-muted);
+  text-decoration: line-through;
+}
+
+.combo-card-save {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #3fb950;
+  background: rgba(46, 160, 67, 0.16);
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  white-space: nowrap;
+}
+
+.combo-card-add {
+  margin-top: 0.5rem;
+  padding: 0.7rem 1rem;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ffc65a, #ff9d1c);
+  color: #0b1712;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.combo-card-add:hover {
+  filter: brightness(1.05);
+}
+
 .food-card-jain-badge {
   display: inline-flex;
   align-items: center;

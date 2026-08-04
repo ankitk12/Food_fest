@@ -21,6 +21,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
+  Combo,
   Coupon,
   Customer,
   FoodItem,
@@ -38,6 +39,8 @@ export interface StoreSnapshot {
   wallets: Wallet[];
   customers: Customer[];
   coupons?: Coupon[];
+  /** Combo bundles created by the admin (clubbed items sold at a set price). */
+  combos?: Combo[];
   /** Overridden available quantities keyed by itemId (post-seed mutations). */
   itemQuantities: Record<string, number>;
   /** Overridden prices (INR) keyed by itemId (post-seed admin edits). */
@@ -63,6 +66,7 @@ export function emptySnapshot(): StoreSnapshot {
     wallets: [],
     customers: [],
     coupons: [],
+    combos: [],
     itemQuantities: {},
     itemPrices: {},
     customItems: [],

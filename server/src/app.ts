@@ -35,10 +35,12 @@ import {
   StoreWalletRepo,
   StoreFoodItemRepo,
   StoreCouponRepo,
+  StoreComboRepo,
   type CustomerRepo,
   type WalletRepo,
   type FoodItemRepo,
   type CouponRepo,
+  type ComboRepo,
 } from "./repos.js";
 
 /** Collaborators required to build the app. */
@@ -54,6 +56,7 @@ export interface AppDependencies {
   walletRepo?: WalletRepo;
   foodItemRepo?: FoodItemRepo;
   couponRepo?: CouponRepo;
+  comboRepo?: ComboRepo;
 }
 
 /** The consistent error payload shape used by every API error response. */
@@ -87,6 +90,7 @@ export function createApp(deps: AppDependencies): Express {
   const walletRepo: WalletRepo = deps.walletRepo ?? new StoreWalletRepo(store);
   const foodItemRepo: FoodItemRepo = deps.foodItemRepo ?? new StoreFoodItemRepo(store);
   const couponRepo: CouponRepo = deps.couponRepo ?? new StoreCouponRepo(store);
+  const comboRepo: ComboRepo = deps.comboRepo ?? new StoreComboRepo(store);
   const app = express();
 
   app.use(express.json());
@@ -293,17 +297,25 @@ export function createApp(deps: AppDependencies): Express {
       // available stock. This prevents orders for items the admin has marked
       // out of stock, even if the user's client hasn't refreshed yet.
       for (const cartItem of items) {
-        const foodItem = await foodItemRepo.get(cartItem.itemId);
-        if (foodItem && foodItem.availableQuantity < cartItem.quantity) {
-          const errBody: ApiError = {
-            error:
-              foodItem.availableQuantity === 0
-                ? `"${cartItem.name}" is out of stock`
-                : `"${cartItem.name}" only has ${foodItem.availableQuantity} available (you requested ${cartItem.quantity})`,
-            code: "INSUFFICIENT_STOCK",
-          };
-          res.status(400).json(errBody);
-          return;
+        // A combo line validates each of its clubbed items; a normal line
+        // validates just its own item.
+        const idsToCheck =
+          cartItem.comboItemIds && cartItem.comboItemIds.length > 0
+            ? cartItem.comboItemIds
+            : [cartItem.itemId];
+        for (const id of idsToCheck) {
+          const foodItem = await foodItemRepo.get(id);
+          if (foodItem && foodItem.availableQuantity < cartItem.quantity) {
+            const errBody: ApiError = {
+              error:
+                foodItem.availableQuantity === 0
+                  ? `"${foodItem.name}" is out of stock`
+                  : `"${foodItem.name}" only has ${foodItem.availableQuantity} available (you requested ${cartItem.quantity})`,
+              code: "INSUFFICIENT_STOCK",
+            };
+            res.status(400).json(errBody);
+            return;
+          }
         }
       }
 
@@ -374,12 +386,19 @@ export function createApp(deps: AppDependencies): Express {
       // real-time for other users. Written directly to the DB (awaited) so the
       // change is durable immediately, not on a background write.
       for (const cartItem of items) {
-        const currentItem = await foodItemRepo.get(cartItem.itemId);
-        if (currentItem) {
-          await foodItemRepo.updateStock(
-            cartItem.itemId,
-            Math.max(0, currentItem.availableQuantity - cartItem.quantity)
-          );
+        // A combo line deducts each clubbed item; a normal line deducts itself.
+        const idsToDeduct =
+          cartItem.comboItemIds && cartItem.comboItemIds.length > 0
+            ? cartItem.comboItemIds
+            : [cartItem.itemId];
+        for (const id of idsToDeduct) {
+          const currentItem = await foodItemRepo.get(id);
+          if (currentItem) {
+            await foodItemRepo.updateStock(
+              id,
+              Math.max(0, currentItem.availableQuantity - cartItem.quantity)
+            );
+          }
         }
       }
 
@@ -1045,6 +1064,111 @@ export function createApp(deps: AppDependencies): Express {
       res.status(200).json({ deleted: code });
     }
   );
+
+  // --- GET /api/combos ----------------------------------------------------
+  //
+  // Returns all active combos. Public endpoint — the home page fetches this to
+  // show combo bundles to customers.
+  app.get("/api/combos", async (_req: Request, res: Response): Promise<void> => {
+    const combos = await comboRepo.list();
+    res.status(200).json(combos.filter((c) => c.active));
+  });
+
+  // --- GET /api/admin/combos ----------------------------------------------
+  //
+  // Returns all combos (active + inactive) for the admin panel.
+  app.get("/api/admin/combos", async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json(await comboRepo.list());
+  });
+
+  // --- POST /api/admin/combos ---------------------------------------------
+  //
+  // Create a combo bundle: a name, the clubbed item ids, and a combo price.
+  //
+  // SECURITY NOTE: like the other /api/admin/* routes, this is unauthenticated
+  // for the festival demo and MUST be placed behind seller authentication in
+  // production.
+  app.post("/api/admin/combos", async (req: Request, res: Response): Promise<void> => {
+    const body = (req.body ?? {}) as {
+      name?: unknown;
+      itemIds?: unknown;
+      price?: unknown;
+      imageUrl?: unknown;
+    };
+
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (name === "") {
+      res.status(400).json({ error: "name is required", code: "INVALID_COMBO" });
+      return;
+    }
+
+    const itemIds =
+      Array.isArray(body.itemIds)
+        ? body.itemIds.filter((id): id is string => typeof id === "string" && id.trim() !== "")
+        : [];
+    if (itemIds.length < 2) {
+      res.status(400).json({
+        error: "A combo must club at least two items",
+        code: "INVALID_COMBO",
+      });
+      return;
+    }
+
+    // Validate that every clubbed item exists.
+    for (const id of itemIds) {
+      const item = await foodItemRepo.get(id);
+      if (!item) {
+        res.status(400).json({
+          error: `Unknown item in combo: ${id}`,
+          code: "INVALID_COMBO",
+        });
+        return;
+      }
+    }
+
+    if (
+      typeof body.price !== "number" ||
+      !Number.isFinite(body.price) ||
+      body.price <= 0
+    ) {
+      res.status(400).json({ error: "price must be a positive number", code: "INVALID_PRICE" });
+      return;
+    }
+
+    const id = `combo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const combo = {
+      id,
+      name,
+      itemIds,
+      price: body.price,
+      active: true,
+      ...(typeof body.imageUrl === "string" && body.imageUrl.trim() !== ""
+        ? { imageUrl: body.imageUrl.trim() }
+        : {}),
+    };
+    await comboRepo.save(combo);
+    await store.flush();
+    res.status(201).json(combo);
+  });
+
+  // --- DELETE /api/admin/combos/:id ---------------------------------------
+  //
+  // Delete a combo by id.
+  app.delete("/api/admin/combos/:id", async (req: Request, res: Response): Promise<void> => {
+    const id = req.params.id ?? "";
+    if (!id) {
+      res.status(400).json({ error: "id is required", code: "VALIDATION_ERROR" });
+      return;
+    }
+    const existing = await comboRepo.get(id);
+    if (!existing) {
+      res.status(404).json({ error: "Combo not found", code: "NOT_FOUND" });
+      return;
+    }
+    await comboRepo.delete(id);
+    await store.flush();
+    res.status(200).json({ deleted: id });
+  });
 
   // --- GET /api/wallet/:customerId ----------------------------------------
   //

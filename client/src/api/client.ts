@@ -13,6 +13,7 @@
 
 import type {
   CartItem,
+  Combo,
   Coupon,
   Customer,
   FoodItem,
@@ -388,6 +389,38 @@ export function createAdminCoupon(
 /** DELETE /api/admin/coupons/:code — delete a coupon. */
 export function deleteAdminCoupon(code: string): Promise<{ deleted: string }> {
   return request<{ deleted: string }>(`/admin/coupons/${encodeURIComponent(code)}`, {
+    method: "DELETE",
+  });
+}
+
+// --- Combos ----------------------------------------------------------------
+
+/** Request body for creating a combo bundle via the admin form. */
+export interface CreateComboRequest {
+  name: string;
+  itemIds: string[];
+  price: number;
+  imageUrl?: string;
+}
+
+/** GET /api/combos — all active combos (public). */
+export function getCombos(): Promise<Combo[]> {
+  return request<Combo[]>("/combos");
+}
+
+/** GET /api/admin/combos — all combos for admin. */
+export function getAdminCombos(): Promise<Combo[]> {
+  return request<Combo[]>("/admin/combos");
+}
+
+/** POST /api/admin/combos — create a combo bundle. */
+export function createAdminCombo(combo: CreateComboRequest): Promise<Combo> {
+  return postJson<Combo>("/admin/combos", combo);
+}
+
+/** DELETE /api/admin/combos/:id — delete a combo. */
+export function deleteAdminCombo(id: string): Promise<{ deleted: string }> {
+  return request<{ deleted: string }>(`/admin/combos/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
 }

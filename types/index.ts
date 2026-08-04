@@ -31,10 +31,16 @@ export interface FoodItem {
   price: number; // INR, > 0
   stallId: string;
   /**
-   * Optional extra-cheese add-on price (₹), configured per item by the admin.
-   * When absent or 0, the item offers no cheese add-on.
+   * Optional extra add-on price (₹), configured per item by the admin. When
+   * absent or 0, the item offers no add-on.
    */
   cheesePrice?: number;
+  /**
+   * Optional label for the add-on (e.g. "Cheese Corn"), configured per item by
+   * the admin. Defaults to "cheese" when absent. Only meaningful when
+   * `cheesePrice` is set.
+   */
+  addonName?: string;
   /**
    * Whether a Jain version of this item is available, configured per item by
    * the admin. When true, the customer can request the Jain option (no charge).
@@ -48,6 +54,24 @@ export interface FoodItem {
   displayOrder?: number;
 }
 
+/**
+ * A combo bundle created by the admin: a set of food items clubbed together
+ * and sold at a single combo `price` (usually lower than the sum of the
+ * items' individual prices, so the customer saves).
+ */
+export interface Combo {
+  id: string;
+  name: string;
+  /** Ids of the food items clubbed into this combo. */
+  itemIds: string[];
+  /** The bundled price (₹) for all the clubbed items together. */
+  price: number;
+  /** Whether the combo is currently offered to customers. */
+  active: boolean;
+  /** Optional image for the combo card. */
+  imageUrl?: string;
+}
+
 export interface CartItem {
   itemId: string;
   name: string;
@@ -59,6 +83,17 @@ export interface CartItem {
   cheesePrice?: number;
   /** Whether the customer requested the Jain version of this line's item. */
   jain?: boolean;
+  /**
+   * When set, this line is a combo bundle (not a single item). `itemId` holds
+   * the combo's id, `unitPrice` is the combo price, and the fields below list
+   * the clubbed items (for stock deduction on the server and display in the
+   * cart/checkout/admin views).
+   */
+  comboId?: string;
+  /** Ids of the food items clubbed into this combo. */
+  comboItemIds?: string[];
+  /** Names of the clubbed items, for display. */
+  comboItemNames?: string[];
 }
 
 export interface Stall {

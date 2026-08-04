@@ -16,8 +16,8 @@ import { useScrollReveal } from "../hooks/useScrollReveal.js";
 import { HeroSection } from "./HeroSection.js";
 import { TickerMarquee } from "./TickerMarquee.js";
 import type { TickerItem } from "./TickerMarquee.js";
-import type { Coupon, FoodItem } from "../../../types/index.js";
-import { getAllItems, getCoupons } from "../api/client.js";
+import type { Combo, Coupon, FoodItem } from "../../../types/index.js";
+import { getAllItems, getCombos, getCoupons } from "../api/client.js";
 import { ROUTES } from "../routes.js";
 import { useCart } from "../cart/CartContext.js";
 import { usePolling } from "../hooks/usePolling.js";
@@ -28,7 +28,7 @@ export function HomePage(): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   useScrollReveal(containerRef);
 
-  const { addItem, toggleCheese, toggleJain, cart, increment, decrement, removeItem } =
+  const { addItem, addCombo, toggleCheese, toggleJain, cart, increment, decrement, removeItem } =
     useCart();
 
   const fetchMenu = useCallback(() => getAllItems(), []);
@@ -39,7 +39,26 @@ export function HomePage(): JSX.Element {
   const { data: coupons } = usePolling<Coupon[]>(fetchCoupons);
   const offers = (coupons ?? []).filter((c) => c.active);
 
+  // Active combo bundles created by the admin.
+  const fetchCombos = useCallback(() => getCombos(), []);
+  const { data: combos } = usePolling<Combo[]>(fetchCombos);
+
   const menuItems = items ?? [];
+  // Lookup by id so combo cards can resolve their clubbed items.
+  const itemsById = useMemo(
+    () => new Map(menuItems.map((item) => [item.id, item])),
+    [menuItems]
+  );
+
+  // Only show combos whose clubbed items all still exist and are in stock.
+  const availableCombos = (combos ?? []).filter(
+    (combo) =>
+      combo.itemIds.length > 0 &&
+      combo.itemIds.every((id) => {
+        const it = itemsById.get(id);
+        return it && it.availableQuantity > 0;
+      })
+  );
 
   // Ticker items mirror the live menu: each catalogue item shows its name and
   // current price in the scrolling marquee (empty until the menu loads).
@@ -57,6 +76,59 @@ export function HomePage(): JSX.Element {
     <main className="home" ref={containerRef}>
       <HeroSection items={menuItems} offers={offers} />
       <TickerMarquee items={tickerItems} />
+
+      {availableCombos.length > 0 && (
+        <section className="home-combos" style={{ padding: "48px 6vw 0" }}>
+          <header className="home-order-header">
+            <h2 className="home-order-title">Combo Deals</h2>
+            <p className="home-order-subtitle">
+              Clubbed favourites at a better price — add the whole combo in one tap.
+            </p>
+          </header>
+
+          <ul className="combo-card-list">
+            {availableCombos.map((combo) => {
+              const comboItems = combo.itemIds
+                .map((id) => itemsById.get(id))
+                .filter((i): i is FoodItem => i !== undefined);
+              const regularTotal = comboItems.reduce((sum, i) => sum + i.price, 0);
+              const savings = regularTotal - combo.price;
+              return (
+                <li key={combo.id}>
+                  <article className="combo-card" data-testid={`combo-card-${combo.id}`}>
+                    {combo.imageUrl && (
+                      <img className="combo-card-image" src={combo.imageUrl} alt={combo.name} />
+                    )}
+                    <div className="combo-card-body">
+                      <h3 className="combo-card-name">{combo.name}</h3>
+                      <p className="combo-card-items">
+                        {comboItems.map((i) => i.name).join(" + ")}
+                      </p>
+                      <div className="combo-card-pricing">
+                        <span className="combo-card-price">{formatINR(combo.price)}</span>
+                        {savings > 0 && (
+                          <>
+                            <span className="combo-card-strike">{formatINR(regularTotal)}</span>
+                            <span className="combo-card-save">SAVE {formatINR(savings)}</span>
+                          </>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className="combo-card-add"
+                        data-testid={`combo-add-${combo.id}`}
+                        onClick={() => addCombo(combo, comboItems)}
+                      >
+                        Add Combo
+                      </button>
+                    </div>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <section className="home-order" style={{ padding: "48px 6vw 96px" }}>
         <header className="home-order-header">

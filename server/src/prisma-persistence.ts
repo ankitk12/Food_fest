@@ -11,8 +11,8 @@ import {
   type StoreSnapshot,
 } from "./persistence.js";
 import type { OrderRepo } from "./order-repo.js";
-import { PrismaCouponRepo, PrismaCustomerRepo, PrismaWalletRepo, PrismaFoodItemRepo } from "./prisma-repos.js";
-import type { CouponRepo, CustomerRepo, WalletRepo, FoodItemRepo } from "./repos.js";
+import { PrismaComboRepo, PrismaCouponRepo, PrismaCustomerRepo, PrismaWalletRepo, PrismaFoodItemRepo } from "./prisma-repos.js";
+import type { ComboRepo, CouponRepo, CustomerRepo, WalletRepo, FoodItemRepo } from "./repos.js";
 import type {
   CartItem,
   FoodItem,
@@ -37,10 +37,11 @@ export class PrismaPersistence implements PersistenceAdapter {
    * `load()` can return the restored state.
    */
   async init(): Promise<void> {
-    const [customers, wallets, coupons] = await Promise.all([
+    const [customers, wallets, coupons, combos] = await Promise.all([
       this.prisma.customer.findMany(),
       this.prisma.wallet.findMany(),
       this.prisma.coupon.findMany(),
+      this.prisma.combo.findMany(),
     ]);
 
     const snapshot: StoreSnapshot = {
@@ -59,6 +60,14 @@ export class PrismaPersistence implements PersistenceAdapter {
         discountPercent: c.discountPercent,
         minOrderValue: c.minOrderValue,
         active: c.active,
+      })),
+      combos: combos.map((c) => ({
+        id: c.id,
+        name: c.name,
+        itemIds: c.itemIds,
+        price: c.price,
+        active: c.active,
+        ...(c.imageUrl ? { imageUrl: c.imageUrl } : {}),
       })),
       // Stock/price live on the FoodItem table itself (no ItemState table).
     };
@@ -122,6 +131,21 @@ export class PrismaPersistence implements PersistenceAdapter {
       });
     });
 
+    const comboUpserts = (s.combos ?? []).map((c) => {
+      const fields = {
+        name: c.name,
+        itemIds: c.itemIds,
+        price: c.price,
+        active: c.active,
+        imageUrl: c.imageUrl ?? null,
+      };
+      return this.prisma.combo.upsert({
+        where: { id: c.id },
+        create: { id: c.id, ...fields },
+        update: { ...fields },
+      });
+    });
+
     const itemDeletions =
       s.deletedItemIds.length > 0
         ? [
@@ -136,6 +160,7 @@ export class PrismaPersistence implements PersistenceAdapter {
       ...walletUpserts,
       ...customItemUpserts,
       ...couponUpserts,
+      ...comboUpserts,
       ...itemDeletions,
     ];
 
@@ -191,6 +216,10 @@ export class PrismaPersistence implements PersistenceAdapter {
 
   createCouponRepo(): CouponRepo {
     return new PrismaCouponRepo(this.prisma);
+  }
+
+  createComboRepo(): ComboRepo {
+    return new PrismaComboRepo(this.prisma);
   }
 
   /** Flush any pending write and close the connection (graceful shutdown). */
@@ -311,6 +340,7 @@ function rowToFoodItem(row: {
   price: number;
   stallId: string;
   cheesePrice?: number | null;
+  addonName?: string | null;
   jainAvailable?: boolean | null;
   displayOrder?: number | null;
 }): FoodItem {
@@ -324,6 +354,7 @@ function rowToFoodItem(row: {
     price: row.price,
     stallId: row.stallId,
     ...(row.cheesePrice != null ? { cheesePrice: row.cheesePrice } : {}),
+    ...(row.addonName ? { addonName: row.addonName } : {}),
     ...(row.jainAvailable != null ? { jainAvailable: row.jainAvailable } : {}),
     ...(row.displayOrder != null ? { displayOrder: row.displayOrder } : {}),
   };

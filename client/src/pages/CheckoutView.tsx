@@ -294,11 +294,17 @@ export function CheckoutView(): JSX.Element {
             data-testid={`checkout-item-${line.itemId}`}
           >
             <span className="checkout-item-name">
+              {line.comboId && <span className="cart-line-combo-tag">Combo</span>}
               {line.quantity}× {line.name}
               {line.addCheese && (
                 <span className="checkout-item-addon"> + Cheese</span>
               )}
               {line.jain && <span className="checkout-item-addon"> · Jain</span>}
+              {line.comboItemNames && line.comboItemNames.length > 0 && (
+                <span className="cart-line-combo-items">
+                  {line.comboItemNames.join(" + ")}
+                </span>
+              )}
             </span>
             <span className="checkout-item-total">
               {formatINR(cartLineTotal(line))}

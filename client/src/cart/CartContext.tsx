@@ -21,6 +21,7 @@ import {
 import type { FoodItem } from "../../../types/index.js";
 import {
   addToCart as addToCartPure,
+  addComboToCart as addComboToCartPure,
   setCheese as setCheesePure,
   setJain as setJainPure,
   cartTotal,
@@ -28,6 +29,7 @@ import {
   removeItem as removeItemPure,
   setQuantity as setQuantityPure,
   type Cart,
+  type ComboInput,
 } from "./cart.js";
 
 export interface CartContextValue {
@@ -36,6 +38,8 @@ export interface CartContextValue {
   total: number;
   /** Add one unit of the given food item (optionally with cheese / Jain). */
   addItem: (item: FoodItem, addCheese?: boolean, jain?: boolean) => void;
+  /** Add a combo as a single independent cart line at the combo price. */
+  addCombo: (combo: ComboInput, items: FoodItem[]) => void;
   /** Toggle the extra-cheese add-on on an existing cart line. */
   toggleCheese: (itemId: string, addCheese: boolean) => void;
   /** Toggle the Jain option on an existing cart line. */
@@ -64,6 +68,10 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
 
   const addItem = useCallback((item: FoodItem, addCheese = false, jain = false) => {
     setCart((current) => addToCartPure(current, item, addCheese, jain));
+  }, []);
+
+  const addCombo = useCallback((combo: ComboInput, items: FoodItem[]) => {
+    setCart((current) => addComboToCartPure(current, combo, items));
   }, []);
 
   const toggleCheese = useCallback((itemId: string, addCheese: boolean) => {
@@ -135,6 +143,7 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
       cart,
       total: cartTotal(cart),
       addItem,
+      addCombo,
       toggleCheese,
       toggleJain,
       setItemQuantity,
@@ -148,6 +157,7 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
     [
       cart,
       addItem,
+      addCombo,
       toggleCheese,
       toggleJain,
       setItemQuantity,
