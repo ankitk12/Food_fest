@@ -7,6 +7,7 @@
 import { PrismaClient, Prisma } from "@prisma/client";
 import {
   emptySnapshot,
+  runWithRetry,
   type PersistenceAdapter,
   type StoreSnapshot,
 } from "./persistence.js";
@@ -101,7 +102,7 @@ export class PrismaPersistence implements PersistenceAdapter {
     // transient DB error is logged rather than failing the request. Orders are
     // NOT part of this snapshot — they're persisted directly by PrismaOrderRepo.
     this.writeChain = this.writeChain
-      .then(() => this.persistAll(snapshot))
+      .then(() => runWithRetry(() => this.persistAll(snapshot)))
       .catch((err: unknown) => {
         console.error("Failed to persist state to Postgres:", err);
       });
@@ -265,11 +266,13 @@ export class PrismaOrderRepo implements OrderRepo {
 
   async save(order: Order): Promise<void> {
     const data = orderToRow(order);
-    await this.prisma.order.upsert({
-      where: { token: order.token },
-      create: data,
-      update: data,
-    });
+    await runWithRetry(() =>
+      this.prisma.order.upsert({
+        where: { token: order.token },
+        create: data,
+        update: data,
+      })
+    );
   }
 
   async usedTokens(): Promise<Set<string>> {

@@ -8,14 +8,33 @@
  * data file, and the default (no-persistence) Store must never write to disk.
  */
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import * as fs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Store } from "./store.js";
 import type { Customer, Order } from "../../types/index.js";
+import { runWithRetry, JsonFilePersistence } from "./persistence.js";
 
 const tempDirs: string[] = [];
+
+let shouldFsWriteFail = false;
+let fsWriteAttempts = 0;
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...actual,
+    writeFileSync: (...args: any[]) => {
+      if (shouldFsWriteFail) {
+        fsWriteAttempts++;
+        throw new Error("Disk write failed");
+      }
+      return actual.writeFileSync(...args);
+    },
+  };
+});
 
 function tempDataFile(): string {
   const dir = mkdtempSync(join(tmpdir(), "bytebites-persist-"));
@@ -115,3 +134,66 @@ describe("default Store does not persist", () => {
     expect(existsSync(dataFile)).toBe(false);
   });
 });
+
+describe("Database / Save Retry Mechanism", () => {
+  it("runWithRetry succeeds on first attempt", async () => {
+    let calls = 0;
+    const result = await runWithRetry(async () => {
+      calls++;
+      return "success";
+    });
+    expect(result).toBe("success");
+    expect(calls).toBe(1);
+  });
+
+  it("runWithRetry succeeds on third attempt after two failures", async () => {
+    let calls = 0;
+    const result = await runWithRetry(async () => {
+      calls++;
+      if (calls < 3) {
+        throw new Error("Temporary error");
+      }
+      return "success";
+    });
+    expect(result).toBe("success");
+    expect(calls).toBe(3);
+  });
+
+  it("runWithRetry fails after third attempt", async () => {
+    let calls = 0;
+    await expect(
+      runWithRetry(async () => {
+        calls++;
+        throw new Error("Persistent error");
+      })
+    ).rejects.toThrow("Persistent error");
+    expect(calls).toBe(3);
+  });
+
+  it("JsonFilePersistence.save retries 3 times on write failure", () => {
+    const dataFile = join(tmpdir(), "failing-db.json");
+    const adapter = new JsonFilePersistence(dataFile);
+    
+    shouldFsWriteFail = true;
+    fsWriteAttempts = 0;
+
+    try {
+      expect(() => adapter.save({
+        orders: [],
+        wallets: [],
+        customers: [],
+        coupons: [],
+        combos: [],
+        itemQuantities: {},
+        itemPrices: {},
+        customItems: [],
+        deletedItemIds: [],
+      })).toThrow("Disk write failed");
+    } finally {
+      shouldFsWriteFail = false;
+    }
+
+    expect(fsWriteAttempts).toBe(3);
+  });
+});
+

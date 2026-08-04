@@ -129,7 +129,32 @@ export class JsonFilePersistence implements PersistenceAdapter {
   }
 
   save(snapshot: StoreSnapshot): void {
-    mkdirSync(dirname(this.filePath), { recursive: true });
-    writeFileSync(this.filePath, JSON.stringify(snapshot, null, 2), "utf8");
+    let lastError: any;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        mkdirSync(dirname(this.filePath), { recursive: true });
+        writeFileSync(this.filePath, JSON.stringify(snapshot, null, 2), "utf8");
+        return;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError;
   }
 }
+
+/**
+ * Run an async function with up to maxAttempts retry operations (defaults to 3).
+ */
+export async function runWithRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
+  let lastError: any;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+

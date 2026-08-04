@@ -11,6 +11,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { Combo, Coupon, Customer, FoodItem, Wallet } from "../../types/index.js";
 import type { ComboRepo, CouponRepo, CustomerRepo, FoodItemRepo, WalletRepo } from "./repos.js";
+import { runWithRetry } from "./persistence.js";
 
 // --- Row <-> Domain Helpers ------------------------------------------------
 
@@ -60,18 +61,20 @@ export class PrismaCustomerRepo implements CustomerRepo {
   }
 
   async save(customer: Customer): Promise<void> {
-    await this.prisma.customer.upsert({
-      where: { mobile: customer.mobile },
-      create: {
-        mobile: customer.mobile,
-        name: customer.name,
-        email: customer.email ?? null,
-      },
-      update: {
-        name: customer.name,
-        email: customer.email ?? null,
-      },
-    });
+    await runWithRetry(() =>
+      this.prisma.customer.upsert({
+        where: { mobile: customer.mobile },
+        create: {
+          mobile: customer.mobile,
+          name: customer.name,
+          email: customer.email ?? null,
+        },
+        update: {
+          name: customer.name,
+          email: customer.email ?? null,
+        },
+      })
+    );
   }
 
   async list(): Promise<Customer[]> {
@@ -96,19 +99,23 @@ export class PrismaWalletRepo implements WalletRepo {
   }
 
   async save(wallet: Wallet): Promise<void> {
-    await this.prisma.wallet.upsert({
-      where: { customerId: wallet.customerId },
-      create: { customerId: wallet.customerId, foodCoins: wallet.foodCoins },
-      update: { foodCoins: wallet.foodCoins },
-    });
+    await runWithRetry(() =>
+      this.prisma.wallet.upsert({
+        where: { customerId: wallet.customerId },
+        create: { customerId: wallet.customerId, foodCoins: wallet.foodCoins },
+        update: { foodCoins: wallet.foodCoins },
+      })
+    );
   }
 
   async addCoins(customerId: string, amount: number): Promise<Wallet> {
-    const row = await this.prisma.wallet.upsert({
-      where: { customerId },
-      create: { customerId, foodCoins: amount },
-      update: { foodCoins: { increment: amount } },
-    });
+    const row = await runWithRetry(() =>
+      this.prisma.wallet.upsert({
+        where: { customerId },
+        create: { customerId, foodCoins: amount },
+        update: { foodCoins: { increment: amount } },
+      })
+    );
     return { customerId: row.customerId, foodCoins: row.foodCoins };
   }
 
@@ -118,10 +125,12 @@ export class PrismaWalletRepo implements WalletRepo {
     if (available < amount) {
       throw new Error(`Insufficient FoodCoins: balance ${available}, requested ${amount}`);
     }
-    const row = await this.prisma.wallet.update({
-      where: { customerId },
-      data: { foodCoins: { decrement: amount } },
-    });
+    const row = await runWithRetry(() =>
+      this.prisma.wallet.update({
+        where: { customerId },
+        data: { foodCoins: { decrement: amount } },
+      })
+    );
     return { customerId: row.customerId, foodCoins: row.foodCoins };
   }
 }
@@ -143,29 +152,35 @@ export class PrismaFoodItemRepo implements FoodItemRepo {
 
   async save(item: FoodItem): Promise<void> {
     // Stock and price live on the FoodItem row itself — no separate table.
-    await this.prisma.foodItem.upsert({
-      where: { id: item.id },
-      create: { ...item },
-      update: { ...item },
-    });
+    await runWithRetry(() =>
+      this.prisma.foodItem.upsert({
+        where: { id: item.id },
+        create: { ...item },
+        update: { ...item },
+      })
+    );
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.foodItem.deleteMany({ where: { id } });
+    await runWithRetry(() => this.prisma.foodItem.deleteMany({ where: { id } }));
   }
 
   async updateStock(id: string, availableQuantity: number): Promise<void> {
-    await this.prisma.foodItem.update({
-      where: { id },
-      data: { availableQuantity },
-    });
+    await runWithRetry(() =>
+      this.prisma.foodItem.update({
+        where: { id },
+        data: { availableQuantity },
+      })
+    );
   }
 
   async updatePrice(id: string, price: number): Promise<void> {
-    await this.prisma.foodItem.update({
-      where: { id },
-      data: { price },
-    });
+    await runWithRetry(() =>
+      this.prisma.foodItem.update({
+        where: { id },
+        data: { price },
+      })
+    );
   }
 }
 
@@ -198,26 +213,30 @@ export class PrismaCouponRepo implements CouponRepo {
   }
 
   async save(coupon: Coupon): Promise<void> {
-    await this.prisma.coupon.upsert({
-      where: { code: coupon.code.toUpperCase() },
-      create: {
-        code: coupon.code.toUpperCase(),
-        discountPercent: coupon.discountPercent,
-        minOrderValue: coupon.minOrderValue,
-        active: coupon.active,
-      },
-      update: {
-        discountPercent: coupon.discountPercent,
-        minOrderValue: coupon.minOrderValue,
-        active: coupon.active,
-      },
-    });
+    await runWithRetry(() =>
+      this.prisma.coupon.upsert({
+        where: { code: coupon.code.toUpperCase() },
+        create: {
+          code: coupon.code.toUpperCase(),
+          discountPercent: coupon.discountPercent,
+          minOrderValue: coupon.minOrderValue,
+          active: coupon.active,
+        },
+        update: {
+          discountPercent: coupon.discountPercent,
+          minOrderValue: coupon.minOrderValue,
+          active: coupon.active,
+        },
+      })
+    );
   }
 
   async delete(code: string): Promise<void> {
-    await this.prisma.coupon.deleteMany({
-      where: { code: code.toUpperCase() },
-    });
+    await runWithRetry(() =>
+      this.prisma.coupon.deleteMany({
+        where: { code: code.toUpperCase() },
+      })
+    );
   }
 }
 
@@ -244,15 +263,17 @@ export class PrismaComboRepo implements ComboRepo {
       active: combo.active,
       imageUrl: combo.imageUrl ?? null,
     };
-    await this.prisma.combo.upsert({
-      where: { id: combo.id },
-      create: { id: combo.id, ...data },
-      update: data,
-    });
+    await runWithRetry(() =>
+      this.prisma.combo.upsert({
+        where: { id: combo.id },
+        create: { id: combo.id, ...data },
+        update: data,
+      })
+    );
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.combo.deleteMany({ where: { id } });
+    await runWithRetry(() => this.prisma.combo.deleteMany({ where: { id } }));
   }
 }
 
